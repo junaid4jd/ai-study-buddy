@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "301777066204",
+    "project_id": "grocery-ai-app-d8e45",
+    "storage_bucket": "grocery-ai-app-d8e45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:301777066204:android:f7f77c2c6720a76ceafc19",
+        "android_client_info": {
+          "package_name": "com.aibuddy.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4ZaogvqyPh48ZLMRRV3gI0H_pXeTjdLU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
