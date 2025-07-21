@@ -10,8 +10,8 @@ class ApiConfig {
   // 4. Click "Create new secret key"
   // 5. Copy the key and paste it below
 
-  // IMPORTANT: Replace "YOUR_OPENAI_API_KEY_HERE" with your actual API key
-  static const String openAiApiKey = "YOUR_OPENAI_API_KEY_HERE";
+  // IMPORTANT: Replace "" with your actual API key
+  static const String openAiApiKey = "";
 
   // ============================================================================
   // OPENAI SETTINGS - CUSTOMIZE AS NEEDED
@@ -65,13 +65,13 @@ Keep responses concise but informative. Always be supportive and encouraging.
   // Check if API key is configured
   static bool get isApiKeyConfigured {
     return openAiApiKey.isNotEmpty &&
-        openAiApiKey != "YOUR_OPENAI_API_KEY_HERE" &&
+        openAiApiKey != "" &&
         (openAiApiKey.startsWith("sk-") || openAiApiKey.startsWith("sk-proj-"));
   }
 
   // Get validation message
   static String get validationMessage {
-    if (openAiApiKey.isEmpty || openAiApiKey == "YOUR_OPENAI_API_KEY_HERE") {
+    if (openAiApiKey.isEmpty || openAiApiKey == "") {
       return "Please add your OpenAI API key in lib/config/api_config.dart";
     }
     if (!openAiApiKey.startsWith("sk-") &&
@@ -93,7 +93,7 @@ Keep responses concise but informative. Always be supportive and encouraging.
    - Create new secret key
 
 ✅ STEP 2: ADD YOUR API KEY
-   - Replace "YOUR_OPENAI_API_KEY_HERE" above with your actual key
+   - Replace "" above with your actual key
    - Make sure it starts with "sk-" or "sk-proj-"
 
 ✅ STEP 3: TEST THE APP
