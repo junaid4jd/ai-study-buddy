@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
+import 'dart:io' show Platform;
 import 'ai_service.dart';
 
 class VoiceService {
@@ -18,8 +20,10 @@ class VoiceService {
   bool _isListening = false;
   bool _isAvailable = false;
   bool _isSpeaking = false;
+  bool _isInitialized = false;
   String _lastRecognizedText = '';
   double _confidence = 0.0;
+  String? _initializationError;
 
   // Getters
   bool get isListening => _isListening;
@@ -28,37 +32,70 @@ class VoiceService {
 
   bool get isSpeaking => _isSpeaking;
 
+  bool get isInitialized => _isInitialized;
+
   String get lastRecognizedText => _lastRecognizedText;
 
   double get confidence => _confidence;
 
-  // Initialize voice services
+  String? get initializationError => _initializationError;
+
+  // Initialize voice services with comprehensive error handling
   Future<bool> initialize() async {
+    if (_isInitialized) {
+      return _isAvailable;
+    }
+
     try {
-      // Request microphone permission
-      final micPermission = await Permission.microphone.request();
-      if (!micPermission.isGranted) {
+      _initializationError = null;
+
+      if (kDebugMode) {
+        print('Starting voice service initialization...');
+      }
+
+      // Check if running on supported platform
+      if (!_isPlatformSupported()) {
+        _initializationError = 'Voice features not supported on this platform';
         if (kDebugMode) {
-          print('Microphone permission denied');
+          print(_initializationError);
+        }
+        return false;
+      }
+
+      // Initialize Text-to-Speech first (usually more reliable)
+      final ttsInitialized = await _initializeTts();
+      if (!ttsInitialized) {
+        _initializationError = 'Text-to-Speech initialization failed';
+        if (kDebugMode) {
+          print(_initializationError);
+        }
+        // Continue with STT even if TTS fails
+      }
+
+      // Request and check microphone permission
+      final permissionGranted = await _requestMicrophonePermission();
+      if (!permissionGranted) {
+        _initializationError =
+        'Microphone permission denied. Please enable microphone access in device settings.';
+        if (kDebugMode) {
+          print(_initializationError);
         }
         return false;
       }
 
       // Initialize Speech-to-Text
-      _isAvailable = await _speechToText.initialize(
-        onStatus: _onSpeechStatus,
-        onError: _onSpeechError,
-      );
-
-      if (!_isAvailable) {
+      final sttInitialized = await _initializeSpeechToText();
+      if (!sttInitialized) {
+        _initializationError =
+        'Speech recognition not available on this device';
         if (kDebugMode) {
-          print('Speech recognition not available');
+          print(_initializationError);
         }
         return false;
       }
 
-      // Initialize Text-to-Speech
-      await _initializeTts();
+      _isInitialized = true;
+      _isAvailable = true;
 
       if (kDebugMode) {
         print('Voice service initialized successfully');
@@ -66,6 +103,7 @@ class VoiceService {
 
       return true;
     } catch (e) {
+      _initializationError = 'Voice service initialization failed: $e';
       if (kDebugMode) {
         print('Voice service initialization failed: $e');
       }
@@ -73,42 +111,123 @@ class VoiceService {
     }
   }
 
-  Future<void> _initializeTts() async {
-    await _flutterTts.setLanguage('en-US');
-    await _flutterTts.setSpeechRate(0.5);
-    await _flutterTts.setVolume(0.8);
-    await _flutterTts.setPitch(1.0);
-
-    _flutterTts.setStartHandler(() {
-      _isSpeaking = true;
-      if (kDebugMode) {
-        print('TTS started');
-      }
-    });
-
-    _flutterTts.setCompletionHandler(() {
-      _isSpeaking = false;
-      if (kDebugMode) {
-        print('TTS completed');
-      }
-    });
-
-    _flutterTts.setErrorHandler((msg) {
-      _isSpeaking = false;
-      if (kDebugMode) {
-        print('TTS error: $msg');
-      }
-    });
+  bool _isPlatformSupported() {
+    try {
+      return Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+    } catch (e) {
+      // Fallback for web or other platforms
+      return !kIsWeb;
+    }
   }
 
-  // Speech-to-Text functionality
+  Future<bool> _requestMicrophonePermission() async {
+    try {
+      final status = await Permission.microphone.status;
+
+      if (status.isGranted) {
+        return true;
+      }
+
+      if (status.isDenied) {
+        final result = await Permission.microphone.request();
+        return result.isGranted;
+      }
+
+      if (status.isPermanentlyDenied) {
+        if (kDebugMode) {
+          print('Microphone permission permanently denied');
+        }
+        return false;
+      }
+
+      return false;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Permission request error: $e');
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _initializeSpeechToText() async {
+    try {
+      final available = await _speechToText.initialize(
+        onStatus: _onSpeechStatus,
+        onError: _onSpeechError,
+        debugLogging: kDebugMode,
+      );
+
+      if (available) {
+        final locales = await _speechToText.locales();
+        if (kDebugMode) {
+          print('Speech recognition available with ${locales.length} locales');
+        }
+      }
+
+      return available;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Speech-to-text initialization error: $e');
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _initializeTts() async {
+    try {
+      // Set default language
+      await _flutterTts.setLanguage('en-US');
+
+      // Set default speech settings
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(0.8);
+      await _flutterTts.setPitch(1.0);
+
+      // Set up event handlers
+      _flutterTts.setStartHandler(() {
+        _isSpeaking = true;
+        if (kDebugMode) {
+          print('TTS started');
+        }
+      });
+
+      _flutterTts.setCompletionHandler(() {
+        _isSpeaking = false;
+        if (kDebugMode) {
+          print('TTS completed');
+        }
+      });
+
+      _flutterTts.setErrorHandler((msg) {
+        _isSpeaking = false;
+        if (kDebugMode) {
+          print('TTS error: $msg');
+        }
+      });
+
+      // Test TTS availability
+      final voices = await _flutterTts.getVoices;
+      if (kDebugMode) {
+        print('TTS initialized with ${voices?.length ?? 0} voices');
+      }
+
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('TTS initialization error: $e');
+      }
+      return false;
+    }
+  }
+
+  // Speech-to-Text functionality with improved error handling
   Future<void> startListening({
     String localeId = 'en_US',
     Function(String)? onResult,
     Function(String)? onError,
   }) async {
-    if (!_isAvailable) {
-      onError?.call('Speech recognition not available');
+    if (!_isAvailable || !_isInitialized) {
+      onError?.call(_initializationError ?? 'Speech recognition not available');
       return;
     }
 
@@ -117,6 +236,12 @@ class VoiceService {
     }
 
     try {
+      final permissionGranted = await _requestMicrophonePermission();
+      if (!permissionGranted) {
+        onError?.call('Microphone permission required');
+        return;
+      }
+
       await _speechToText.listen(
         onResult: (result) {
           _lastRecognizedText = result.recognizedWords;
@@ -133,6 +258,7 @@ class VoiceService {
         partialResults: true,
         localeId: localeId,
         listenMode: stt.ListenMode.confirmation,
+        cancelOnError: true,
       );
       _isListening = true;
     } catch (e) {
@@ -144,9 +270,15 @@ class VoiceService {
   }
 
   Future<void> stopListening() async {
-    if (_isListening) {
-      await _speechToText.stop();
-      _isListening = false;
+    try {
+      if (_isListening) {
+        await _speechToText.stop();
+        _isListening = false;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Stop listening error: $e');
+      }
     }
   }
 
@@ -164,16 +296,32 @@ class VoiceService {
     }
   }
 
-  // Text-to-Speech functionality
+  // Text-to-Speech functionality with improved error handling
   Future<void> speak(String text) async {
+    if (text
+        .trim()
+        .isEmpty) return;
+
     try {
       if (_isSpeaking) {
         await stopSpeaking();
       }
+
       await _flutterTts.speak(text);
     } catch (e) {
       if (kDebugMode) {
         print('TTS speak error: $e');
+      }
+      // Try alternative text-to-speech approach
+      try {
+        if (Platform.isAndroid) {
+          await _flutterTts.awaitSpeakCompletion(true);
+          await _flutterTts.speak(text);
+        }
+      } catch (e2) {
+        if (kDebugMode) {
+          print('Alternative TTS failed: $e2');
+        }
       }
     }
   }
@@ -205,7 +353,9 @@ class VoiceService {
 
       return response;
     } catch (e) {
-      final errorMsg = 'Sorry, I encountered an error: $e';
+      final errorMsg = 'Sorry, I encountered an error: ${e
+          .toString()
+          .replaceAll('Exception: ', '')}';
       if (speakResponse) {
         await speak(errorMsg);
       }
@@ -334,7 +484,7 @@ class VoiceService {
   Future<List<Map<String, String>>> getAvailableVoices() async {
     try {
       final voices = await _flutterTts.getVoices;
-      return List<Map<String, String>>.from(voices);
+      return List<Map<String, String>>.from(voices ?? []);
     } catch (e) {
       if (kDebugMode) {
         print('Get voices error: $e');
@@ -356,20 +506,60 @@ class VoiceService {
 
   // Adjust speech settings
   Future<void> setSpeechRate(double rate) async {
-    await _flutterTts.setSpeechRate(rate.clamp(0.0, 1.0));
+    try {
+      await _flutterTts.setSpeechRate(rate.clamp(0.1, 1.0));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Set speech rate error: $e');
+      }
+    }
   }
 
   Future<void> setPitch(double pitch) async {
-    await _flutterTts.setPitch(pitch.clamp(0.5, 2.0));
+    try {
+      await _flutterTts.setPitch(pitch.clamp(0.5, 2.0));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Set pitch error: $e');
+      }
+    }
   }
 
   Future<void> setVolume(double volume) async {
-    await _flutterTts.setVolume(volume.clamp(0.0, 1.0));
+    try {
+      await _flutterTts.setVolume(volume.clamp(0.0, 1.0));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Set volume error: $e');
+      }
+    }
+  }
+
+  // Force reinitialize (useful for troubleshooting)
+  Future<bool> reinitialize() async {
+    _isInitialized = false;
+    _isAvailable = false;
+    return await initialize();
+  }
+
+  // Get detailed status for debugging
+  Map<String, dynamic> getStatus() {
+    return {
+      'isInitialized': _isInitialized,
+      'isAvailable': _isAvailable,
+      'isListening': _isListening,
+      'isSpeaking': _isSpeaking,
+      'initializationError': _initializationError,
+      'platform': Platform.operatingSystem,
+      'platformSupported': _isPlatformSupported(),
+    };
   }
 
   // Cleanup
   Future<void> dispose() async {
     await stopListening();
     await stopSpeaking();
+    _isInitialized = false;
+    _isAvailable = false;
   }
 }

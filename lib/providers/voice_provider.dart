@@ -61,12 +61,25 @@ class VoiceProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      if (kDebugMode) {
+        print('VoiceProvider: Starting initialization...');
+      }
+
       final success = await _voiceService.initialize();
       _isInitialized = success;
 
       if (!success) {
-        _error =
-        'Voice service initialization failed. Please check permissions.';
+        _error = _voiceService.initializationError ??
+            'Voice service initialization failed. Please check permissions.';
+        if (kDebugMode) {
+          print('VoiceProvider: Initialization failed - $_error');
+          final status = _voiceService.getStatus();
+          print('VoiceProvider: Service status - $status');
+        }
+      } else {
+        if (kDebugMode) {
+          print('VoiceProvider: Initialization successful');
+        }
       }
 
       notifyListeners();
@@ -74,15 +87,47 @@ class VoiceProvider with ChangeNotifier {
     } catch (e) {
       _error = 'Initialization error: $e';
       _isInitialized = false;
+      if (kDebugMode) {
+        print('VoiceProvider: Initialization exception - $e');
+      }
       notifyListeners();
       return false;
     }
   }
 
+  // Retry initialization
+  Future<bool> retryInitialization() async {
+    if (kDebugMode) {
+      print('VoiceProvider: Retrying initialization...');
+    }
+    return await _voiceService.reinitialize().then((success) {
+      _isInitialized = success;
+      if (!success) {
+        _error = _voiceService.initializationError ?? 'Retry failed';
+      } else {
+        _error = null;
+      }
+      notifyListeners();
+      return success;
+    });
+  }
+
+  // Get detailed debug info
+  Map<String, dynamic> getDebugInfo() {
+    final serviceStatus = _voiceService.getStatus();
+    return {
+      ...serviceStatus,
+      'providerMode': _currentMode.toString(),
+      'providerError': _error,
+      'recognizedText': _recognizedText,
+      'lastResponse': _lastResponse,
+    };
+  }
+
   // Start voice listening
   Future<void> startListening() async {
     if (!_isInitialized) {
-      _error = 'Voice service not initialized';
+      _error = 'Voice service not initialized. Please retry initialization.';
       notifyListeners();
       return;
     }
@@ -107,6 +152,9 @@ class VoiceProvider with ChangeNotifier {
     } catch (e) {
       _error = 'Failed to start listening: $e';
       _currentMode = VoiceMode.idle;
+      if (kDebugMode) {
+        print('VoiceProvider: Start listening error - $e');
+      }
       notifyListeners();
     }
   }
@@ -119,6 +167,9 @@ class VoiceProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _error = 'Failed to stop listening: $e';
+      if (kDebugMode) {
+        print('VoiceProvider: Stop listening error - $e');
+      }
       notifyListeners();
     }
   }
@@ -156,6 +207,9 @@ class VoiceProvider with ChangeNotifier {
     } catch (e) {
       _error = 'AI request failed: $e';
       _currentMode = VoiceMode.idle;
+      if (kDebugMode) {
+        print('VoiceProvider: AI request error - $e');
+      }
       notifyListeners();
     }
   }
@@ -173,6 +227,9 @@ class VoiceProvider with ChangeNotifier {
     } catch (e) {
       _error = 'Speech failed: $e';
       _currentMode = VoiceMode.idle;
+      if (kDebugMode) {
+        print('VoiceProvider: Speech error - $e');
+      }
       notifyListeners();
     }
   }
@@ -185,6 +242,9 @@ class VoiceProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _error = 'Failed to stop speaking: $e';
+      if (kDebugMode) {
+        print('VoiceProvider: Stop speaking error - $e');
+      }
       notifyListeners();
     }
   }
@@ -212,6 +272,9 @@ class VoiceProvider with ChangeNotifier {
     } catch (e) {
       _error = 'Flashcard reading failed: $e';
       _currentMode = VoiceMode.idle;
+      if (kDebugMode) {
+        print('VoiceProvider: Flashcard reading error - $e');
+      }
       notifyListeners();
     }
   }
@@ -234,6 +297,9 @@ class VoiceProvider with ChangeNotifier {
     } catch (e) {
       _error = 'Pronunciation practice failed: $e';
       _currentMode = VoiceMode.idle;
+      if (kDebugMode) {
+        print('VoiceProvider: Pronunciation practice error - $e');
+      }
       notifyListeners();
       return 0.0;
     }
@@ -265,6 +331,9 @@ class VoiceProvider with ChangeNotifier {
     } catch (e) {
       _error = 'Voice note failed: $e';
       _currentMode = VoiceMode.idle;
+      if (kDebugMode) {
+        print('VoiceProvider: Voice note error - $e');
+      }
       notifyListeners();
       return '';
     }
@@ -282,7 +351,7 @@ class VoiceProvider with ChangeNotifier {
   }
 
   Future<void> setSpeechRate(double rate) async {
-    _speechRate = rate.clamp(0.0, 1.0);
+    _speechRate = rate.clamp(0.1, 1.0);
     await _voiceService.setSpeechRate(_speechRate);
     notifyListeners();
   }

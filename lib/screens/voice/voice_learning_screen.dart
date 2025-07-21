@@ -60,16 +60,76 @@ class _VoiceLearningScreenState extends State<VoiceLearningScreen>
 
   Future<void> _initializeVoice() async {
     final voiceProvider = context.read<VoiceProvider>();
+
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Initializing voice services...'),
+          ],
+        ),
+        duration: Duration(seconds: 3),
+      ),
+    );
+
     final success = await voiceProvider.initialize();
 
-    if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Voice service initialization failed. Please check permissions.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Voice services ready!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        final error = voiceProvider.error ?? 'Unknown initialization error';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.error, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text('Voice initialization failed'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  error,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => voiceProvider.retryInitialization(),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -93,6 +153,10 @@ class _VoiceLearningScreenState extends State<VoiceLearningScreen>
               IconButton(
                 icon: const Icon(Icons.settings),
                 onPressed: () => _showSettingsDialog(voiceProvider),
+              ),
+              IconButton(
+                icon: const Icon(Icons.info),
+                onPressed: () => _showDebugInfo(),
               ),
             ],
           ),
@@ -474,7 +538,7 @@ class _VoiceLearningScreenState extends State<VoiceLearningScreen>
                         .titleLarge
                         ?.copyWith(
                       fontWeight: FontWeight.bold,
-                        ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -855,29 +919,92 @@ class _VoiceLearningScreenState extends State<VoiceLearningScreen>
                     onChanged: voiceProvider.setSpeechRate,
                     min: 0.1,
                     max: 1.0,
-              ),
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Pitch'),
+                  subtitle: Slider(
+                    value: voiceProvider.pitch,
+                    onChanged: voiceProvider.setPitch,
+                    min: 0.5,
+                    max: 2.0,
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Volume'),
+                  subtitle: Slider(
+                    value: voiceProvider.volume,
+                    onChanged: voiceProvider.setVolume,
+                    min: 0.0,
+                    max: 1.0,
+                  ),
+                ),
+              ],
             ),
-            ListTile(
-              title: const Text('Pitch'),
-              subtitle: Slider(
-                value: voiceProvider.pitch,
-                onChanged: voiceProvider.setPitch,
-                min: 0.5,
-                max: 2.0,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
               ),
-            ),
-            ListTile(
-              title: const Text('Volume'),
-              subtitle: Slider(
-                value: voiceProvider.volume,
-                onChanged: voiceProvider.setVolume,
-                min: 0.0,
-                max: 1.0,
+            ],
+          ),
+    );
+  }
+
+  void _showDebugInfo() {
+    final voiceProvider = context.read<VoiceProvider>();
+    final debugInfo = voiceProvider.getDebugInfo();
+
+    showDialog(
+      context: context,
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Voice Service Debug Info'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: debugInfo.entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 120,
+                          child: Text(
+                            '${entry.key}:',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            entry.value?.toString() ?? 'null',
+                            style: const TextStyle(fontFamily: 'monospace'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
-            ),
-          ],
         ),
         actions: [
+          TextButton(
+            onPressed: () {
+              // Copy debug info to clipboard
+              final debugText = debugInfo.entries
+                  .map((e) => '${e.key}: ${e.value}')
+                  .join('\n');
+              // You could use Clipboard.setData here if needed
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Debug info available in console')),
+              );
+            },
+            child: const Text('Copy'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
