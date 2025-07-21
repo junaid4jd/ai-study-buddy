@@ -3,10 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/flashcard_model.dart';
 import '../services/ai_service.dart';
+import '../services/progress_service.dart';
 
 class FlashcardProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final AIService _aiService = AIService();
+  final ProgressService _progressService = ProgressService();
   final Uuid _uuid = const Uuid();
 
   List<FlashcardModel> _flashcards = [];
@@ -67,6 +69,9 @@ class FlashcardProvider with ChangeNotifier {
           .doc(flashcard.id)
           .set(flashcard.toFirestore());
 
+      // Track flashcard creation in progress (3 minutes average time per flashcard)
+      await _progressService.trackFlashcardCreation(userId, studyTime: 3);
+
       _flashcards.insert(0, flashcard);
       _isLoading = false;
       notifyListeners();
@@ -103,6 +108,9 @@ class FlashcardProvider with ChangeNotifier {
           .collection('flashcards')
           .doc(flashcard.id)
           .set(flashcard.toFirestore());
+
+      // Track AI-generated flashcard creation (3 minutes average)
+      await _progressService.trackFlashcardCreation(userId, studyTime: 3);
 
       _flashcards.insert(0, flashcard);
       _isLoading = false;
@@ -167,6 +175,10 @@ class FlashcardProvider with ChangeNotifier {
           now.millisecondsSinceEpoch.toString(): difficultyRating,
         },
       );
+
+      // Track flashcard review in progress (1 minute average per review)
+      await _progressService.trackFlashcardReview(
+          flashcard.userId, studyTime: 1);
 
       await updateFlashcard(updatedFlashcard);
     } catch (e) {

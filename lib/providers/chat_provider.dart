@@ -5,11 +5,13 @@ import 'package:uuid/uuid.dart';
 import '../models/chat_message_model.dart';
 import '../services/ai_service.dart';
 import '../services/achievement_service.dart';
+import '../services/progress_service.dart';
 
 class ChatProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final AIService _aiService = AIService();
   final AchievementService _achievementService = AchievementService();
+  final ProgressService _progressService = ProgressService();
   final Uuid _uuid = const Uuid();
 
   List<ChatMessageModel> _messages = [];
@@ -112,6 +114,9 @@ class ChatProvider with ChangeNotifier {
 
       _totalQuestions++;
       await _achievementService.trackQuestionAsked(userId, _totalQuestions);
+
+      // Track question in progress service (2 minutes average time per question)
+      await _progressService.trackQuestion(userId, studyTime: 2);
 
       await _firestore
           .collection('chats')

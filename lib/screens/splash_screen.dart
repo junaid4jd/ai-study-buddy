@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
+import '../services/permission_service.dart';
 import 'auth/login_screen.dart';
 import 'home/home_screen.dart';
 import 'onboarding/onboarding_screen.dart';
@@ -22,6 +23,8 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _dotsController;
   late Animation<double> _rotationAnimation;
   late Animation<double> _pulseAnimation;
+
+  String _statusText = 'Initializing...';
 
   @override
   void initState() {
@@ -76,12 +79,39 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  void _updateStatus(String status) {
+    if (mounted) {
+      setState(() {
+        _statusText = status;
+      });
+    }
+  }
+
   Future<void> _navigateToNextScreen() async {
     // Wait for minimum splash duration
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(const Duration(milliseconds: 1000));
 
     if (!mounted) return;
 
+    // Step 1: Request essential permissions
+    _updateStatus('Requesting permissions...');
+    final permissionService = PermissionService();
+    final permissionResult = await permissionService
+        .requestEssentialPermissions();
+
+    if (!mounted) return;
+
+    // Show permission status briefly
+    if (permissionResult.allGranted) {
+      _updateStatus('Permissions granted!');
+    } else if (permissionResult.hasPermissionIssues) {
+      _updateStatus('Some permissions denied');
+      // Show brief message but continue
+      await Future.delayed(const Duration(milliseconds: 1000));
+    }
+
+    // Step 2: Initialize auth provider
+    _updateStatus('Loading user data...');
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     // Wait for auth provider to initialize
@@ -90,11 +120,21 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
     }
 
+    // Step 3: Check onboarding status
+    _updateStatus('Finalizing setup...');
+    await Future.delayed(const Duration(milliseconds: 500));
+
     final prefs = await SharedPreferences.getInstance();
     final isOnboardingCompleted = prefs.getBool('onboarding_completed') ??
         false;
 
     if (!mounted) return;
+
+    // Show permission dialog if needed
+    if (permissionResult.hasPermissionIssues &&
+        permissionResult.hasPermanentDenials) {
+      await _showPermissionDialog(permissionResult);
+    }
 
     // Navigate based on auth state
     if (isOnboardingCompleted) {
@@ -112,6 +152,72 @@ class _SplashScreenState extends State<SplashScreen>
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
       );
     }
+  }
+
+  Future<void> _showPermissionDialog(PermissionRequestResult result) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Permissions Needed'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(result.statusMessage),
+                const SizedBox(height: 16),
+                const Text(
+                  'Voice Learning features require microphone access to provide:',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.only(left: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('• Voice-to-text recognition'),
+                      Text('• AI voice conversations'),
+                      Text('• Pronunciation practice'),
+                      Text('• Voice note taking'),
+                    ],
+                  ),
+                ),
+                if (result.hasPermanentDenials) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Please enable microphone access in Settings to use voice features.',
+                    style: TextStyle(
+                        color: Colors.red, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              if (result.hasPermanentDenials)
+                TextButton(
+                  onPressed: () async {
+                    await PermissionService().openAppSettings();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Open Settings'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+    );
   }
 
   @override
@@ -195,6 +301,18 @@ class _SplashScreenState extends State<SplashScreen>
               ),
 
               const SizedBox(height: 48),
+
+              // Status Text
+              Text(
+                _statusText,
+                style: Theme
+                    .of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(
+                  color: Colors.white.withAlpha(200),
+                ),
+              ),
 
               // Animated Loading Dots
               const SizedBox(height: 32),

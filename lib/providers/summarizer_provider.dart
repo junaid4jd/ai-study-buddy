@@ -3,23 +3,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/study_summary_model.dart';
 import '../services/ai_service.dart';
+import '../services/progress_service.dart';
 
 class SummarizerProvider with ChangeNotifier {
   final AIService _aiService = AIService();
+  final ProgressService _progressService = ProgressService();
   final List<StudySummary> _summaries = [];
   bool _isLoading = false;
   String? _error;
+  String? _currentUserId;
 
   List<StudySummary> get summaries => _summaries;
-
   bool get isLoading => _isLoading;
-
   String? get error => _error;
-
   bool get isConfigured => _aiService.isConfigured;
 
   SummarizerProvider() {
     _loadSummaries();
+  }
+
+  void setUserId(String userId) {
+    if (_currentUserId != userId) {
+      _currentUserId = userId;
+      _loadSummaries(); // Reload summaries for new user
+    }
   }
 
   Future<void> _loadSummaries() async {
@@ -58,9 +65,7 @@ class SummarizerProvider with ChangeNotifier {
   }
 
   Future<StudySummary?> generateSummary(String content, String subject) async {
-    if (content
-        .trim()
-        .isEmpty) {
+    if (content.trim().isEmpty) {
       _error = 'Please enter some content to summarize';
       notifyListeners();
       return null;
@@ -78,6 +83,11 @@ class SummarizerProvider with ChangeNotifier {
 
       // Save to local storage
       await _saveSummaries();
+
+      // Track summarizer usage in progress (5 minutes average time)
+      if (_currentUserId != null) {
+        await _progressService.trackStudySession(_currentUserId!, 5);
+      }
 
       _isLoading = false;
       notifyListeners();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/progress_provider.dart';
 import '../../utils/app_theme.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -14,19 +15,12 @@ class _StatsScreenState extends State<StatsScreen> {
   bool _isLoading = true;
   String _selectedPeriod = 'Week';
 
-  // Sample data - in a real app, this would come from a database
-  int _questionsAsked = 0;
-  int _flashcardsCreated = 0;
-  int _quizzesTaken = 0;
-  int _studyStreak = 1;
-  double _averageScore = 0.0;
-
   final List<String> _periods = ['Week', 'Month', 'Year'];
 
   @override
   void initState() {
     super.initState();
-    // Load stats after the first frame is built to avoid setState during build
+    // Load stats after the first frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadStats();
     });
@@ -35,17 +29,17 @@ class _StatsScreenState extends State<StatsScreen> {
   Future<void> _loadStats() async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final progressProvider = Provider.of<ProgressProvider>(
+          context, listen: false);
+
       if (authProvider.user != null) {
-        // For now, just show some sample stats to avoid the provider issues
-        setState(() {
-          _questionsAsked = 25;
-          _flashcardsCreated = 15;
-          _quizzesTaken = 8;
-          _studyStreak = 5;
-          _averageScore = 85.5;
-          _isLoading = false;
-        });
+        // Initialize progress data for the current user
+        await progressProvider.initializeProgress(authProvider.user!.uid);
       }
+
+      setState(() {
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -92,303 +86,477 @@ class _StatsScreenState extends State<StatsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Overview Cards
-            Text(
-              'Overview',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
+          : Consumer<ProgressProvider>(
+        builder: (context, progressProvider, child) {
+          // Get real data from progress provider
+          final userStats = progressProvider.userStats;
+          final todayProgress = progressProvider.todayProgress;
+          final studyGoalProgress = progressProvider.studyGoalProgress;
 
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.1,
+          // Calculate period-specific data
+          final questionsAsked = _getPeriodSpecificValue(
+            userStats?.totalQuestionsAsked ?? 0,
+            todayProgress?.questionsAsked ?? 0,
+          );
+          final flashcardsCreated = _getPeriodSpecificValue(
+            userStats?.totalFlashcardsCreated ?? 0,
+            todayProgress?.flashcardsCreated ?? 0,
+          );
+          final quizzesTaken = _getPeriodSpecificValue(
+            userStats?.totalQuizzesTaken ?? 0,
+            todayProgress?.quizzesTaken ?? 0,
+          );
+          final studyStreak = userStats?.currentStreak ?? 0;
+          final averageScore = userStats?.averageQuizScore ?? 0.0;
+          final todayStudyTime = todayProgress?.totalStudyTime ?? 0;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatCard(
-                  'Questions Asked',
-                  '$_questionsAsked',
-                  Icons.help_outline,
-                  Colors.blue,
-                  '+${(_questionsAsked * 0.1).round()} this week',
+                // Overview Cards
+                Text(
+                  'Overview',
+                  style: Theme
+                      .of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                _buildStatCard(
-                  'Flashcards Created',
-                  '$_flashcardsCreated',
-                  Icons.style,
-                  Colors.green,
-                  '+${(_flashcardsCreated * 0.15).round()} this week',
-                ),
-                _buildStatCard(
-                  'Quizzes Taken',
-                  '$_quizzesTaken',
-                  Icons.quiz,
-                  Colors.orange,
-                  '+${(_quizzesTaken * 0.2).round()} this week',
-                ),
-                _buildStatCard(
-                  'Study Streak',
-                  '$_studyStreak days',
-                  Icons.local_fire_department,
-                  Colors.red,
-                  'Keep it up!',
-                ),
-              ],
-            ),
+                const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
-
-            // Performance Section
-            Text(
-              'Performance',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Average Quiz Score',
-                            style: Theme
-                                .of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.1,
+                        children: [
+                          _buildStatCard(
+                            'Questions Asked',
+                            '$questionsAsked',
+                            Icons.help_outline,
+                            Colors.blue,
+                            _getChangeText(
+                                questionsAsked, 'this $_selectedPeriod'),
                           ),
-                        ),
-                        Text(
-                          '${_averageScore.toStringAsFixed(1)}%',
-                          style: Theme
-                              .of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: _getScoreColor(_averageScore),
+                          _buildStatCard(
+                            'Flashcards Created',
+                            '$flashcardsCreated',
+                            Icons.style,
+                            Colors.green,
+                            _getChangeText(
+                                flashcardsCreated, 'this $_selectedPeriod'),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    LinearProgressIndicator(
-                      value: _averageScore / 100,
-                      backgroundColor: AppTheme.withOpacity(
-                        _getScoreColor(_averageScore),
-                        0.2,
-                      ),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        _getScoreColor(_averageScore),
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _getScoreMessage(_averageScore),
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(
-                        color: AppTheme.withOpacity(
-                          Theme
-                              .of(context)
-                              .colorScheme
-                              .onSurface,
-                          0.7,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Activity Chart Placeholder
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Activity This $_selectedPeriod',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      height: 100,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: AppTheme.withOpacity(
-                          Theme
-                              .of(context)
-                              .colorScheme
-                              .primary,
-                          0.05,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppTheme.withOpacity(
-                            Theme
-                                .of(context)
-                                .colorScheme
-                                .outline,
-                            0.2,
+                          _buildStatCard(
+                            'Quizzes Taken',
+                            '$quizzesTaken',
+                            Icons.quiz,
+                            Colors.orange,
+                            _getChangeText(
+                                quizzesTaken, 'this $_selectedPeriod'),
                           ),
-                        ),
+                          _buildStatCard(
+                            'Study Streak',
+                            '$studyStreak days',
+                            Icons.local_fire_department,
+                            studyStreak > 0 ? Colors.red : Colors.grey,
+                            studyStreak > 0 ? 'Keep it up!' : 'Start studying!',
+                          ),
+                        ],
                       ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.bar_chart,
-                              size: 36,
-                              color: Theme
-                                  .of(context)
-                                  .colorScheme
-                                  .primary,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Activity Chart',
-                              style: Theme
-                                  .of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
-                                color: Theme
-                                    .of(context)
-                                    .colorScheme
-                                    .primary,
-                                fontWeight: FontWeight.bold,
+
+                      const SizedBox(height: 24),
+
+                      // Study Time Today Card
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment
+                                    .spaceBetween,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      'Study Time Today',
+                                      style: Theme
+                                          .of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${todayStudyTime}min',
+                                    style: Theme
+                                        .of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: _getStudyTimeColor(todayStudyTime),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Visual analytics coming soon',
-                              style: Theme
-                                  .of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                color: AppTheme.withOpacity(
-                                  Theme
-                                      .of(context)
-                                      .colorScheme
-                                      .onSurface,
-                                  0.6,
+                              const SizedBox(height: 12),
+                              LinearProgressIndicator(
+                                value: studyGoalProgress != null
+                                    ? (todayStudyTime /
+                                    studyGoalProgress.dailyGoal).clamp(0.0, 1.0)
+                                    : 0.0,
+                                backgroundColor: AppTheme.withOpacity(
+                                  _getStudyTimeColor(todayStudyTime),
+                                  0.2,
+                                ),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  _getStudyTimeColor(todayStudyTime),
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                studyGoalProgress?.isGoalMet == true
+                                    ? 'Daily goal achieved! '
+                                    : 'Goal: ${studyGoalProgress?.dailyGoal ??
+                                    60} minutes daily',
+                                style: Theme
+                                    .of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                  color: AppTheme.withOpacity(
+                                    Theme
+                                        .of(context)
+                                        .colorScheme
+                                        .onSurface,
+                                    0.7,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Goals Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Goals',
-                          style: Theme
-                              .of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                            fontWeight: FontWeight.bold,
+                            ],
                           ),
                         ),
-                        TextButton(
-                          onPressed: _showGoalsDialog,
-                          child: const Text('Set Goals'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildGoalItem(
-                      'Daily Questions',
-                      _questionsAsked % 10,
-                      10,
-                      'questions',
-                      Icons.help_outline,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildGoalItem(
-                      'Weekly Flashcards',
-                      _flashcardsCreated % 15,
-                      15,
-                      'cards',
-                      Icons.style,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildGoalItem(
-                      'Study Streak',
-                      _studyStreak,
-                      7,
-                      'days',
-                      Icons.local_fire_department,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                      ),
 
-            // Bottom padding to ensure content doesn't get cut off
-            const SizedBox(height: 24),
-          ],
+                      const SizedBox(height: 20),
+
+                      // Performance Section
+                      Text(
+                        'Performance',
+                        style: Theme
+                            .of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment
+                                    .spaceBetween,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      'Average Quiz Score',
+                                      style: Theme
+                                          .of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    averageScore > 0
+                                        ? '${averageScore.toStringAsFixed(1)}%'
+                                        : 'No data',
+                                    style: Theme
+                                        .of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: _getScoreColor(averageScore),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (averageScore > 0) ...[
+                                const SizedBox(height: 12),
+                                LinearProgressIndicator(
+                                  value: averageScore / 100,
+                                  backgroundColor: AppTheme.withOpacity(
+                                    _getScoreColor(averageScore),
+                                    0.2,
+                                  ),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    _getScoreColor(averageScore),
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _getScoreMessage(averageScore),
+                                  style: Theme
+                                      .of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                    color: AppTheme.withOpacity(
+                                      Theme
+                                          .of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                      0.7,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Activity Summary Card
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Activity This $_selectedPeriod',
+                                style: Theme
+                                    .of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Activity breakdown
+                              if (todayProgress != null) ...[
+                                _buildActivityRow(
+                                    'Questions', todayProgress.questionsAsked,
+                                    Icons.help_outline, Colors.blue),
+                                const SizedBox(height: 8),
+                                _buildActivityRow('Flashcards',
+                                    todayProgress.flashcardsCreated,
+                                    Icons.style, Colors.green),
+                                const SizedBox(height: 8),
+                                _buildActivityRow(
+                                    'Quiz Sessions', todayProgress.quizzesTaken,
+                                    Icons.quiz, Colors.orange),
+                                const SizedBox(height: 8),
+                                _buildActivityRow(
+                                    'Study Time', todayProgress.totalStudyTime,
+                                    Icons.access_time, Colors.purple),
+                              ] else
+                                ...[
+                                  Container(
+                                    height: 100,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.withOpacity(
+                                        Theme
+                                            .of(context)
+                                            .colorScheme
+                                            .primary,
+                                        0.05,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppTheme.withOpacity(
+                                          Theme
+                                              .of(context)
+                                              .colorScheme
+                                              .outline,
+                                          0.2,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .center,
+                                        children: [
+                                          Icon(
+                                            Icons.trending_up,
+                                            size: 36,
+                                            color: Theme
+                                                .of(context)
+                                                .colorScheme
+                                                .primary,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Start studying to see activity',
+                                            style: Theme
+                                                .of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                              color: AppTheme.withOpacity(
+                                                Theme
+                                                    .of(context)
+                                                    .colorScheme
+                                                    .onSurface,
+                                                0.6,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Goals Section
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment
+                                    .spaceBetween,
+                                children: [
+                                  Text(
+                                    'Daily Goals',
+                                    style: Theme
+                                        .of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: _showGoalsDialog,
+                                    child: const Text('Info'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              _buildGoalItem(
+                                'Daily Questions',
+                                todayProgress?.questionsAsked ?? 0,
+                                10,
+                                'questions',
+                                Icons.help_outline,
+                              ),
+                              const SizedBox(height: 10),
+                              _buildGoalItem(
+                                'Daily Flashcards',
+                                todayProgress?.flashcardsCreated ?? 0,
+                                5,
+                                'cards',
+                                Icons.style,
+                              ),
+                              const SizedBox(height: 10),
+                              _buildGoalItem(
+                                'Study Time',
+                                todayStudyTime,
+                                studyGoalProgress?.dailyGoal ?? 60,
+                                'minutes',
+                                Icons.access_time,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Bottom padding
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  // Helper method to get period-specific values
+  int _getPeriodSpecificValue(int totalValue, int todayValue) {
+    switch (_selectedPeriod) {
+      case 'Week':
+      // Approximate weekly value (today * 7 or total if less)
+        return todayValue * 7 > totalValue ? totalValue : todayValue * 7;
+      case 'Month':
+      // Show total value for month
+        return totalValue;
+      case 'Year':
+      // Show total value for year
+        return totalValue;
+      default:
+        return totalValue;
+    }
+  }
+
+  String _getChangeText(int value, String period) {
+    if (value == 0) return 'Start studying!';
+    return 'Great progress!';
+  }
+
+  Widget _buildActivityRow(String label, int value, IconData icon,
+      Color color) {
+    String displayValue = label == 'Study Time' ? '${value}min' : '$value';
+
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: Theme
+                .of(context)
+                .textTheme
+                .bodyMedium,
+          ),
         ),
-      ),
+        Text(
+          displayValue,
+          style: Theme
+              .of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 
@@ -544,7 +712,15 @@ class _StatsScreenState extends State<StatsScreen> {
   Color _getScoreColor(double score) {
     if (score >= 80) return Colors.green;
     if (score >= 60) return Colors.orange;
-    return Colors.red;
+    if (score > 0) return Colors.red;
+    return Colors.grey;
+  }
+
+  Color _getStudyTimeColor(int minutes) {
+    if (minutes >= 60) return Colors.green;
+    if (minutes >= 30) return Colors.orange;
+    if (minutes > 0) return Colors.blue;
+    return Colors.grey;
   }
 
   String _getScoreMessage(double score) {
@@ -561,11 +737,13 @@ class _StatsScreenState extends State<StatsScreen> {
       context: context,
       builder: (context) =>
           AlertDialog(
-            title: const Text('Set Your Goals'),
+            title: const Text('Daily Study Goals'),
             content: const Text(
-              'Goal setting feature will be available in a future update. '
-                  'For now, try to ask 10 questions per day, create 15 flashcards per week, '
-                  'and maintain a 7-day study streak!',
+              'Your daily goals help you maintain consistent study habits:\n\n'
+                  '• 10 Questions: Ask AI tutor for help\n'
+                  '• 5 Flashcards: Create study materials\n'
+                  '• 60 Minutes: Total active study time\n\n'
+                  'Complete these goals daily to build a strong study streak!',
             ),
             actions: [
               TextButton(
