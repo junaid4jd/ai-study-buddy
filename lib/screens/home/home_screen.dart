@@ -9,6 +9,7 @@ import '../quiz/quiz_screen.dart';
 import '../stats/stats_screen.dart';
 import '../profile/profile_screen.dart';
 import '../summarizer/summarizer_screen.dart';
+import '../voice/voice_learning_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -326,10 +327,10 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Custom grid layout for 5 cards
+              // Grid layout with 2 cards per row
               Column(
                 children: [
-                  // First row - 2 cards
+                  // Row 1: AI Tutor & AI Summarizer
                   Row(
                     children: [
                       Expanded(
@@ -361,9 +362,25 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Second row - 3 cards
+                  // Row 2: Voice Learning & Flashcards
                   Row(
                     children: [
+                      Expanded(
+                        child: _buildQuickActionCard(
+                          context,
+                          'Voice Learning',
+                          'Learn with voice',
+                          Icons.record_voice_over,
+                          Colors.deepPurple,
+                              () =>
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (
+                                    context) => const VoiceLearningScreen()),
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _buildQuickActionCard(
                           context,
@@ -374,7 +391,12 @@ class DashboardScreen extends StatelessWidget {
                               () => onNavigate(2),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Row 3: Quiz & Study Stats
+                  Row(
+                    children: [
                       Expanded(
                         child: _buildQuickActionCard(
                           context,
@@ -447,7 +469,7 @@ class DashboardScreen extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          height: 100,
+          height: 110, // Fixed height for consistency
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Theme
@@ -475,19 +497,18 @@ class DashboardScreen extends StatelessWidget {
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
                   color: color,
-                  size: 20,
+                  size: 22,
                 ),
               ),
               const SizedBox(height: 8),
@@ -527,7 +548,7 @@ class DashboardScreen extends StatelessWidget {
                   fontSize: 10,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
