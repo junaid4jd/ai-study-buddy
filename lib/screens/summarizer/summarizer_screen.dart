@@ -5,6 +5,7 @@ import '../../config/app_colors.dart';
 import '../../config/app_strings.dart';
 import '../../providers/summarizer_provider.dart';
 import '../../providers/flashcard_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/study_summary_model.dart';
 import '../../models/flashcard_model.dart';
 import '../../utils/app_theme.dart';
@@ -568,31 +569,43 @@ class _SummarizerScreenState extends State<SummarizerScreen>
     _tabController.animateTo(0);
   }
 
-  void _createFlashcards(StudySummary summary) {
+  void _createFlashcards(StudySummary summary) async {
     final flashcardProvider = context.read<FlashcardProvider>();
 
-    // Create flashcards from key definitions
-    for (final entry in summary.keyDefinitions.entries) {
-      final flashcard = FlashcardModel(
-        id: DateTime
-            .now()
-            .millisecondsSinceEpoch
-            .toString() + entry.key.hashCode.toString(),
-        question: entry.key,
-        answer: entry.value,
-        category: summary.subject,
-        difficultyLevel: 0.5,
-        createdAt: DateTime.now(),
-        lastReviewed: DateTime.now(),
-        reviewCount: 0,
-        correctCount: 0,
+    // Get the current user ID (you'll need to get this from AuthProvider)
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.user?.uid ?? '';
+
+    if (userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to create flashcards'),
+          backgroundColor: Colors.red,
+        ),
       );
-      flashcardProvider.addFlashcard(flashcard);
+      return;
+    }
+
+    // Create flashcards from key definitions
+    int createdCount = 0;
+    for (final entry in summary.keyDefinitions.entries) {
+      try {
+        await flashcardProvider.createFlashcard(
+          entry.key,
+          entry.value,
+          summary.subject,
+          userId,
+        );
+        createdCount++;
+      } catch (e) {
+        // Continue with other flashcards even if one fails
+        continue;
+      }
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Created ${summary.keyDefinitions.length} flashcards!'),
+        content: Text('Created $createdCount flashcards!'),
         backgroundColor: Colors.green,
       ),
     );

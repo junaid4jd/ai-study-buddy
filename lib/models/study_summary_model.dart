@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class StudySummary {
   final String id;
   final String title;
@@ -98,5 +100,3 @@ class StudySummary {
     }
   }
 }
-
-import 'dart:convert';
