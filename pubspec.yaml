@@ -1,5 +1,5 @@
 name: ai_study_buddy
-description: "An AI-powered study companion app with chat-based tutoring, flashcards, and progress tracking."
+description: "AI-powered study companion with chat tutoring, flashcards, and progress tracking. Perfect for students and learners."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -11,41 +11,47 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # UI Components
+  # UI Components & Icons
   cupertino_icons: ^1.0.8
   flutter_svg: ^2.0.10
   lottie: ^3.1.2
   
-  # Firebase
+  # Firebase Services
   firebase_core: ^3.3.0
   firebase_auth: ^5.1.4
   cloud_firestore: ^5.2.1
   firebase_messaging: ^15.0.4
+  firebase_analytics: ^11.0.1
+  firebase_crashlytics: ^4.0.1
   
-  # HTTP & API
+  # HTTP & API Integration
   http: ^1.2.2
   dio: ^5.4.3
   
   # State Management
   provider: ^6.1.2
   
-  # Local Storage
+  # Local Storage & Data
   shared_preferences: ^2.2.3
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   
-  # UI/UX
+  # UI/UX Enhancements
   flutter_staggered_grid_view: ^0.7.0
   flutter_slidable: ^3.1.0
   flutter_animate: ^4.5.0
+  confetti: ^0.7.0
   
-  # Utilities
+  # Utility Packages
   uuid: ^4.4.0
   intl: ^0.19.0
   
-  # Audio (for voice features)
+  # Audio Features (Optional - can be disabled)
   speech_to_text: ^6.6.2
   flutter_tts: ^4.0.2
+
+  # Monetization
+  in_app_purchase: ^3.1.13
 
 dev_dependencies:
   flutter_test:
@@ -57,18 +63,36 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   
+  # Assets Configuration
   assets:
+    # Images
     - assets/images/
-    - assets/animations/
+    - assets/images/app_icons/
+    - assets/images/backgrounds/
+    - assets/images/onboarding/
+    - assets/images/placeholders/
+    
+    # Icons
     - assets/icons/
+    - assets/icons/tab_icons/
+    - assets/icons/feature_icons/
+    - assets/icons/navigation_icons/
+    
+    # Animations
+    - assets/animations/
+    
+    # Fonts (if using custom fonts)
+    - assets/fonts/
   
-  fonts:
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/Poppins-Regular.ttf
-        - asset: assets/fonts/Poppins-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Poppins-Bold.ttf
-          weight: 700
+  # Fonts Configuration (Currently using system fonts)
+  # Uncomment and customize for your brand
+  # fonts:
+  #   - family: CustomFont
+  #     fonts:
+  #       - asset: assets/fonts/CustomFont-Regular.ttf
+  #       - asset: assets/fonts/CustomFont-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/CustomFont-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/CustomFont-Bold.ttf
+  #         weight: 700

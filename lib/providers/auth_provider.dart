@@ -11,44 +11,63 @@ class AuthProvider with ChangeNotifier {
   UserModel? _userModel;
   bool _isLoading = false;
   String? _error;
+  bool _isInitialized = false;
 
   User? get user => _user;
-
   UserModel? get userModel => _userModel;
-
   bool get isLoading => _isLoading;
-
   String? get error => _error;
-
   bool get isLoggedIn => _user != null;
 
+  bool get isInitialized => _isInitialized;
+
   AuthProvider() {
-    _auth.authStateChanges().listen((User? user) {
-      _user = user;
-      if (user != null) {
-        _loadUserData();
-      } else {
-        _userModel = null;
-      }
-      notifyListeners();
-    });
+    _initializeAuth();
   }
 
-  Future<void> _loadUserData() async {
+  Future<void> _initializeAuth() async {
+    try {
+      _user = _auth.currentUser;
+
+      // Listen to auth state changes
+      _auth.authStateChanges().listen((User? user) {
+        _user = user;
+        if (user != null) {
+          // Load user data in background without blocking
+          _loadUserDataInBackground();
+        } else {
+          _userModel = null;
+        }
+        notifyListeners();
+      });
+
+      _isInitialized = true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error initializing auth: $e');
+      }
+      _isInitialized = true; // Still mark as initialized
+    }
+    notifyListeners();
+  }
+
+  // Load user data in background without blocking UI
+  void _loadUserDataInBackground() async {
     if (_user == null) return;
 
     try {
       final doc = await _firestore.collection('users').doc(_user!.uid).get();
       if (doc.exists) {
         _userModel = UserModel.fromFirestore(doc);
+        notifyListeners();
       }
     } catch (e) {
       if (kDebugMode) {
         print('Error loading user data: $e');
       }
     }
-    notifyListeners();
   }
+
 
   Future<bool> signUpWithEmail(String email, String password,
       String displayName) async {
@@ -108,12 +127,12 @@ class AuthProvider with ChangeNotifier {
       if (result.user != null) {
         _user = result.user;
 
-        // Update last login time
-        await _firestore.collection('users').doc(_user!.uid).update({
-          'lastLoginAt': Timestamp.fromDate(DateTime.now()),
-        });
+        // Update last login time in background
+        _updateLastLoginInBackground();
 
-        await _loadUserData();
+        // Load user data in background
+        _loadUserDataInBackground();
+
         _isLoading = false;
         notifyListeners();
         return true;
@@ -148,9 +167,9 @@ class AuthProvider with ChangeNotifier {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (e) {
       if (kDebugMode) {
-        print('Error resetting password: $e');
+        print('Error sending password reset email: $e');
       }
-      rethrow;
+      throw e;
     }
   }
 
@@ -161,7 +180,7 @@ class AuthProvider with ChangeNotifier {
         await _firestore.collection('users').doc(_user!.uid).update({
           'displayName': displayName,
         });
-        await _loadUserData();
+        _loadUserDataInBackground();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -170,18 +189,27 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateUserStats(Map<String, dynamic> stats) async {
+  /// Update FirebaseAuth and Firestore displayName for current user
+  Future<void> updateDisplayName(String displayName) async {
     try {
       if (_user != null) {
+        await _user!.updateDisplayName(displayName);
+        await _user!.reload();
+        _user = _auth.currentUser;
+
+        // Update in Firestore as well
         await _firestore.collection('users').doc(_user!.uid).update({
-          'studyStats': stats,
+          'displayName': displayName,
         });
-        await _loadUserData();
+
+        _loadUserDataInBackground();
+        notifyListeners();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error updating user stats: $e');
+        print('Error updating display name: $e');
       }
+      throw e;
     }
   }
 
@@ -192,7 +220,7 @@ class AuthProvider with ChangeNotifier {
         await _firestore.collection('users').doc(_user!.uid).update({
           'questionsUsed': newCount,
         });
-        await _loadUserData();
+        _loadUserDataInBackground();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -202,7 +230,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   bool canAskQuestion() {
-    if (_userModel == null) return false;
+    if (_userModel == null)
+      return true; // Allow questions if user data not loaded yet
     return _userModel!.isPremium ||
         _userModel!.questionsUsed < _userModel!.maxQuestions;
   }
@@ -210,5 +239,19 @@ class AuthProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  void _updateLastLoginInBackground() async {
+    if (_user == null) return;
+
+    try {
+      await _firestore.collection('users').doc(_user!.uid).update({
+        'lastLoginAt': Timestamp.fromDate(DateTime.now()),
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating last login: $e');
+      }
+    }
   }
 }

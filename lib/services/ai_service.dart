@@ -1,27 +1,54 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../config/api_config.dart';
 
 class AIService {
   static const String _baseUrl = 'https://api.openai.com/v1';
-  static const String _apiKey = 'YOUR_OPENAI_API_KEY_HERE'; // Replace with your actual API key
+  static const String _apiKey = String.fromEnvironment(
+      'OPENAI_API_KEY', defaultValue: '');
+
+  // IMPORTANT: To use AI features, you need to set your OpenAI API key:
+  // 
+  // Method 1 - Run with API key (Recommended for development):
+  // flutter run --dart-define=OPENAI_API_KEY=your_actual_api_key_here
+  //
+  // Method 2 - Set environment variable permanently:
+  // export OPENAI_API_KEY=your_actual_api_key_here
+  // flutter run
+  //
+  // Method 3 - For production, use secure storage or backend proxy
+  //
+  // Get your API key from: https://platform.openai.com/
 
   final Dio _dio = Dio();
 
   AIService() {
-    _dio.options.baseUrl = _baseUrl;
+    _dio.options.baseUrl = ApiConfig.openAiBaseUrl;
     _dio.options.headers = {
-      'Authorization': 'Bearer $_apiKey',
+      'Authorization': 'Bearer ${ApiConfig.openAiApiKey}',
       'Content-Type': 'application/json',
     };
+
+    // Set timeouts from config
+    _dio.options.connectTimeout = const Duration(seconds: 10);
+    _dio.options.receiveTimeout = ApiConfig.requestTimeout;
   }
 
+  bool get isConfigured => ApiConfig.isApiKeyConfigured;
+
+  String get configurationMessage => ApiConfig.validationMessage;
+
   Future<String> generateTutorResponse(String question, String subject) async {
-    try {
+    if (!isConfigured) {
+      return ApiConfig.validationMessage;
+    }
+
+    return _executeWithRetry(() async {
       final response = await _dio.post(
-        '/chat/completions',
+        ApiConfig.chatCompletionsEndpoint,
         data: {
-          'model': 'gpt-3.5-turbo',
+          'model': ApiConfig.openAiModel,
           'messages': [
             {
               'role': 'system',
@@ -42,21 +69,23 @@ class AIService {
 
       final content = response.data['choices'][0]['message']['content'];
       return content.toString().trim();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error generating AI response: $e');
-      }
-      return 'I apologize, but I encountered an error while processing your question. Please try again.';
-    }
+    });
   }
 
   Future<Map<String, String>> generateFlashcard(String topic,
       String subject) async {
-    try {
+    if (!isConfigured) {
+      return {
+        'question': 'API key not configured',
+        'answer': 'Please set OPENAI_API_KEY environment variable to use AI features.',
+      };
+    }
+
+    return _executeWithRetry(() async {
       final response = await _dio.post(
-        '/chat/completions',
+        ApiConfig.chatCompletionsEndpoint,
         data: {
-          'model': 'gpt-3.5-turbo',
+          'model': ApiConfig.openAiModel,
           'messages': [
             {
               'role': 'system',
@@ -82,24 +111,26 @@ class AIService {
         'question': jsonContent['question']?.toString() ?? 'Generated question',
         'answer': jsonContent['answer']?.toString() ?? 'Generated answer',
       };
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error generating flashcard: $e');
-      }
-      return {
-        'question': 'What is $topic?',
-        'answer': 'This is a concept in $subject that requires further study.',
-      };
-    }
+    });
   }
 
   Future<List<Map<String, String>>> generateQuiz(String topic, String subject,
       int numberOfQuestions) async {
-    try {
+    if (!isConfigured) {
+      return [
+        {
+          'question': 'API key not configured',
+          'options': 'Please set OPENAI_API_KEY environment variable to use AI features.|Option B|Option C|Option D',
+          'correct': '0',
+        }
+      ];
+    }
+
+    return _executeWithRetry(() async {
       final response = await _dio.post(
-        '/chat/completions',
+        ApiConfig.chatCompletionsEndpoint,
         data: {
-          'model': 'gpt-3.5-turbo',
+          'model': ApiConfig.openAiModel,
           'messages': [
             {
               'role': 'system',
@@ -128,27 +159,20 @@ class AIService {
             opt.toString()).toList().join('|'),
         'correct': question['correct']?.toString() ?? '0',
       }).toList();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error generating quiz: $e');
-      }
-      return [
-        {
-          'question': 'What is $topic?',
-          'options': 'Option A|Option B|Option C|Option D',
-          'correct': '0',
-        }
-      ];
-    }
+    });
   }
 
   Future<String> explainConcept(String concept, String subject,
       String difficultyLevel) async {
-    try {
+    if (!isConfigured) {
+      return ApiConfig.validationMessage;
+    }
+
+    return _executeWithRetry(() async {
       final response = await _dio.post(
-        '/chat/completions',
+        ApiConfig.chatCompletionsEndpoint,
         data: {
-          'model': 'gpt-3.5-turbo',
+          'model': ApiConfig.openAiModel,
           'messages': [
             {
               'role': 'system',
@@ -168,11 +192,49 @@ class AIService {
 
       final content = response.data['choices'][0]['message']['content'];
       return content.toString().trim();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error explaining concept: $e');
+    });
+  }
+
+  Future<T> _executeWithRetry<T>(Future<T> Function() operation) async {
+    int retryCount = 0;
+
+    while (retryCount < ApiConfig.maxRetries) {
+      try {
+        return await operation();
+      } catch (e) {
+        retryCount++;
+
+        if (kDebugMode) {
+          print('AI Service Error (attempt $retryCount): $e');
+        }
+
+        if (retryCount >= ApiConfig.maxRetries) {
+          // Handle different types of errors
+          if (e is DioException) {
+            switch (e.type) {
+              case DioExceptionType.connectionTimeout:
+              case DioExceptionType.receiveTimeout:
+                throw 'Request timeout. Please check your internet connection and try again.';
+              case DioExceptionType.badResponse:
+                if (e.response?.statusCode == 401) {
+                  throw 'Invalid API key. Please check your OpenAI API key configuration.';
+                } else if (e.response?.statusCode == 429) {
+                  throw 'Rate limit exceeded. Please wait a moment and try again.';
+                } else {
+                  throw 'Server error. Please try again later.';
+                }
+              default:
+                throw 'Network error. Please check your internet connection.';
+            }
+          }
+          throw 'An unexpected error occurred. Please try again.';
+        }
+
+        // Wait before retrying
+        await Future.delayed(ApiConfig.retryDelay);
       }
-      return 'I apologize, but I encountered an error while explaining this concept. Please try again.';
     }
+
+    throw 'Maximum retry attempts reached. Please try again later.';
   }
 }

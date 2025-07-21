@@ -1,0 +1,32 @@
+# iOS Build Optimization Guide
+
+## Xcode Settings to Speed Up Builds:
+
+1. Open ios/Runner.xcworkspace in Xcode
+2. Select "Runner" project in navigator
+3. Go to Build Settings
+4. Search for these settings and modify:
+
+### Debug Configuration:
+- SWIFT_COMPILATION_MODE = "Incremental"
+- SWIFT_OPTIMIZATION_LEVEL = "-Onone" 
+- GCC_OPTIMIZATION_LEVEL = "0"
+- ONLY_ACTIVE_ARCH = "YES"
+- DEBUG_INFORMATION_FORMAT = "dwarf"
+
+### All Configurations:
+- EXCLUDED_ARCHS[sdk=iphonesimulator*] = "arm64"
+- ENABLE_BITCODE = "NO"
+- COMPILER_INDEX_STORE_ENABLE = "NO"
+
+## Terminal Commands for Faster Builds:
+```bash
+# Clean everything
+flutter clean && cd ios && rm -rf Pods/ Podfile.lock && cd ..
+
+# Faster pod install
+cd ios && pod install --verbose && cd ..
+
+# Build for simulator only
+flutter run -d simulator --dart-define=OPENAI_API_KEY=your-key
+```

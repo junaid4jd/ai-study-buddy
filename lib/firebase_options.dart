@@ -41,48 +41,48 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'your-web-api-key',
-    appId: 'your-web-app-id',
-    messagingSenderId: 'your-messaging-sender-id',
-    projectId: 'your-project-id',
-    authDomain: 'your-project-id.firebaseapp.com',
-    storageBucket: 'your-project-id.appspot.com',
-    measurementId: 'your-measurement-id',
+    apiKey: 'AIzaSyBYwUhA4YS-KiyM-z4xpd-HfzpT7cU9jnY',
+    appId: '1:301777066204:web:262bf0f9a7ff9990eafc19',
+    messagingSenderId: '301777066204',
+    projectId: 'grocery-ai-app-d8e45',
+    authDomain: 'grocery-ai-app-d8e45.firebaseapp.com',
+    storageBucket: 'grocery-ai-app-d8e45.firebasestorage.app',
+    measurementId: 'G-MEASUREMENT_ID',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'your-android-api-key',
-    appId: 'your-android-app-id',
-    messagingSenderId: 'your-messaging-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: 'AIzaSyBYwUhA4YS-KiyM-z4xpd-HfzpT7cU9jnY',
+    appId: '1:301777066204:android:262bf0f9a7ff9990eafc19',
+    messagingSenderId: '301777066204',
+    projectId: 'grocery-ai-app-d8e45',
+    storageBucket: 'grocery-ai-app-d8e45.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'your-ios-api-key',
-    appId: 'your-ios-app-id',
-    messagingSenderId: 'your-messaging-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
-    iosBundleId: 'com.example.aiStudyBuddy',
+    apiKey: 'AIzaSyBYwUhA4YS-KiyM-z4xpd-HfzpT7cU9jnY',
+    appId: '1:301777066204:ios:262bf0f9a7ff9990eafc19',
+    messagingSenderId: '301777066204',
+    projectId: 'grocery-ai-app-d8e45',
+    storageBucket: 'grocery-ai-app-d8e45.firebasestorage.app',
+    iosBundleId: 'com.aibuddy.app.aiStudyBuddy',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'your-macos-api-key',
-    appId: 'your-macos-app-id',
-    messagingSenderId: 'your-messaging-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
-    iosBundleId: 'com.example.aiStudyBuddy',
+    apiKey: 'AIzaSyBYwUhA4YS-KiyM-z4xpd-HfzpT7cU9jnY',
+    appId: '1:301777066204:macos:262bf0f9a7ff9990eafc19',
+    messagingSenderId: '301777066204',
+    projectId: 'grocery-ai-app-d8e45',
+    storageBucket: 'grocery-ai-app-d8e45.firebasestorage.app',
+    iosBundleId: 'com.aibuddy.app.aiStudyBuddy',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'your-windows-api-key',
-    appId: 'your-windows-app-id',
-    messagingSenderId: 'your-messaging-sender-id',
-    projectId: 'your-project-id',
-    authDomain: 'your-project-id.firebaseapp.com',
-    storageBucket: 'your-project-id.appspot.com',
-    measurementId: 'your-measurement-id',
+    apiKey: 'AIzaSyBYwUhA4YS-KiyM-z4xpd-HfzpT7cU9jnY',
+    appId: '1:301777066204:windows:262bf0f9a7ff9990eafc19',
+    messagingSenderId: '301777066204',
+    projectId: 'grocery-ai-app-d8e45',
+    authDomain: 'grocery-ai-app-d8e45.firebaseapp.com',
+    storageBucket: 'grocery-ai-app-d8e45.firebasestorage.app',
+    measurementId: 'G-MEASUREMENT_ID',
   );
 }

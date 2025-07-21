@@ -2,37 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
-import 'register_screen.dart';
-import 'forgot_pass_screen.dart';
+import 'login_screen.dart';
 import '../home/home_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _signup() async {
     if (_formKey.currentState?.validate() ?? false) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      final success = await authProvider.signInWithEmail(
+      final success = await authProvider.signUpWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
+        _nameController.text.trim(),
       );
 
       if (success && mounted) {
@@ -72,9 +77,23 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 20),
 
-                  // Logo and Title
+                  // Back button
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.arrow_back,
+                      color: Theme
+                          .of(context)
+                          .colorScheme
+                          .onSurface,
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Header
                   Center(
                     child: Column(
                       children: [
@@ -100,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           child: const Icon(
-                            Icons.school,
+                            Icons.person_add,
                             size: 40,
                             color: Colors.white,
                           ),
@@ -109,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 24),
 
                         Text(
-                          'Welcome Back!',
+                          'Create Account',
                           style: Theme
                               .of(context)
                               .textTheme
@@ -122,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 8),
 
                         Text(
-                          'Sign in to continue your learning journey',
+                          'Join thousands of students learning with AI',
                           style: Theme
                               .of(context)
                               .textTheme
@@ -142,11 +161,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 48),
 
-                  // Login Form
+                  // Signup Form
                   Form(
                     key: _formKey,
                     child: Column(
                       children: [
+                        // Name Field
+                        TextFormField(
+                          controller: _nameController,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'Full Name',
+                            hintText: 'Enter your full name',
+                            prefixIcon: Icon(Icons.person_outline),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your name';
+                            }
+                            if (value.length < 2) {
+                              return 'Name must be at least 2 characters';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 16),
+
                         // Email Field
                         TextFormField(
                           controller: _emailController,
@@ -202,34 +243,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         const SizedBox(height: 16),
 
-                        // Forgot Password Link
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (
-                                      context) => const ForgotPasswordScreen(),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'Forgot Password?',
-                              style: TextStyle(
-                                color: Theme
-                                    .of(context)
-                                    .colorScheme
-                                    .primary,
-                                fontWeight: FontWeight.w500,
+                        // Confirm Password Field
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          obscureText: !_isConfirmPasswordVisible,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm Password',
+                            hintText: 'Confirm your password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isConfirmPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
                               ),
+                              onPressed: () {
+                                setState(() {
+                                  _isConfirmPasswordVisible =
+                                  !_isConfirmPasswordVisible;
+                                });
+                              },
                             ),
                           ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please confirm your password';
+                            }
+                            if (value != _passwordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
                         ),
 
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 24),
 
-                        // Login Button
+                        // Signup Button
                         Consumer<AuthProvider>(
                           builder: (context, authProvider, child) {
                             return SizedBox(
@@ -238,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: ElevatedButton(
                                 onPressed: authProvider.isLoading
                                     ? null
-                                    : _login,
+                                    : _signup,
                                 child: authProvider.isLoading
                                     ? const SizedBox(
                                   width: 20,
@@ -249,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 )
                                     : const Text(
-                                  'Sign In',
+                                  'Create Account',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -302,28 +351,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         const SizedBox(height: 32),
 
-                        // Sign Up Link
+                        // Login Link
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              "Don't have an account? ",
+                              'Already have an account? ',
                               style: Theme
                                   .of(context)
                                   .textTheme
                                   .bodyMedium,
                             ),
                             TextButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (
-                                        context) => const RegisterScreen(),
-                                  ),
-                                );
-                              },
+                              onPressed: () => Navigator.of(context).pop(),
                               child: Text(
-                                'Sign Up',
+                                'Sign In',
                                 style: TextStyle(
                                   color: Theme
                                       .of(context)

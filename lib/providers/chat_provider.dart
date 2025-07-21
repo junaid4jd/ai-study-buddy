@@ -1,184 +1,192 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/chat_message_model.dart';
 import '../services/ai_service.dart';
+import '../services/achievement_service.dart';
 
 class ChatProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final AIService _aiService = AIService();
+  final AchievementService _achievementService = AchievementService();
   final Uuid _uuid = const Uuid();
 
   List<ChatMessageModel> _messages = [];
   bool _isLoading = false;
+  bool _isInitialized = false;
   String? _error;
-  String? _currentSessionId;
+  int _totalQuestions = 0;
+  String? _currentUserId;
 
   List<ChatMessageModel> get messages => _messages;
-
   bool get isLoading => _isLoading;
 
+  bool get isInitialized => _isInitialized;
   String? get error => _error;
+  int get totalQuestions => _totalQuestions;
 
-  String? get currentSessionId => _currentSessionId;
+  // Lazy load chat history when needed
+  Future<void> ensureInitialized(String userId) async {
+    if (_isInitialized && _currentUserId == userId) return;
 
-  void startNewSession() {
-    _currentSessionId = _uuid.v4();
-    _messages.clear();
-    _error = null;
-    notifyListeners();
+    _currentUserId = userId;
+    await loadChatHistory(userId);
   }
 
   Future<void> loadChatHistory(String userId) async {
+    if (_isLoading) return;
+
     try {
       _isLoading = true;
       notifyListeners();
 
       final querySnapshot = await _firestore
-          .collection('chat_messages')
+          .collection('chats')
           .where('userId', isEqualTo: userId)
-          .where('sessionId', isEqualTo: _currentSessionId)
           .orderBy('timestamp', descending: false)
-          .get();
+          .limit(50)
+          .get()
+          .timeout(
+        const Duration(seconds: 10),
+        onTimeout: () =>
+        throw TimeoutException('Loading chat history timed out'),
+      );
 
       _messages = querySnapshot.docs
           .map((doc) => ChatMessageModel.fromFirestore(doc))
           .toList();
 
-      _isLoading = false;
-      notifyListeners();
+      _totalQuestions = _messages
+          .where((msg) => msg.type == MessageType.user)
+          .length;
+
+      _isInitialized = true;
     } catch (e) {
       _error = e.toString();
+      if (kDebugMode) print('Error loading chat history: $e');
+    } finally {
       _isLoading = false;
       notifyListeners();
-      if (kDebugMode) {
-        print('Error loading chat history: $e');
-      }
     }
   }
 
-  Future<void> sendMessage(String content, String userId,
+  Future<bool> sendMessage(String userId, String message,
       String subject) async {
-    if (_currentSessionId == null) {
-      startNewSession();
-    }
-
     try {
       _isLoading = true;
       notifyListeners();
 
-      // Create user message
       final userMessage = ChatMessageModel(
         id: _uuid.v4(),
         userId: userId,
-        sessionId: _currentSessionId!,
-        content: content,
+        sessionId: 'default',
+        content: message,
         type: MessageType.user,
         timestamp: DateTime.now(),
         subject: subject,
       );
 
-      // Add user message to local list
       _messages.add(userMessage);
       notifyListeners();
 
-      // Save user message to Firestore
       await _firestore
-          .collection('chat_messages')
+          .collection('chats')
           .doc(userMessage.id)
           .set(userMessage.toFirestore());
 
-      // Get AI response
       final aiResponse = await _aiService.generateTutorResponse(
-          content, subject);
+          message, subject);
 
-      // Create AI message
       final aiMessage = ChatMessageModel(
         id: _uuid.v4(),
         userId: userId,
-        sessionId: _currentSessionId!,
+        sessionId: 'default',
         content: aiResponse,
         type: MessageType.ai,
         timestamp: DateTime.now(),
         subject: subject,
       );
 
-      // Add AI message to local list
       _messages.add(aiMessage);
+
+      _totalQuestions++;
+      await _achievementService.trackQuestionAsked(userId, _totalQuestions);
+
+      await _firestore
+          .collection('chats')
+          .doc(aiMessage.id)
+          .set(aiMessage.toFirestore());
+
       _isLoading = false;
       notifyListeners();
 
-      // Save AI message to Firestore
-      await _firestore
-          .collection('chat_messages')
-          .doc(aiMessage.id)
-          .set(aiMessage.toFirestore());
+      return true;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
-      if (kDebugMode) {
-        print('Error sending message: $e');
-      }
+      if (kDebugMode) print('Error sending message: $e');
+      return false;
     }
   }
 
-  Future<void> bookmarkMessage(String messageId, bool isBookmarked) async {
-    try {
-      await _firestore
-          .collection('chat_messages')
-          .doc(messageId)
-          .update({'isBookmarked': isBookmarked});
-
-      // Update local message
-      final messageIndex = _messages.indexWhere((msg) => msg.id == messageId);
-      if (messageIndex != -1) {
-        _messages[messageIndex] =
-            _messages[messageIndex].copyWith(isBookmarked: isBookmarked);
-        notifyListeners();
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error bookmarking message: $e');
-      }
-    }
-  }
-
-  Future<List<ChatMessageModel>> getBookmarkedMessages(String userId) async {
+  Future<void> clearChatHistory(String userId) async {
     try {
       final querySnapshot = await _firestore
-          .collection('chat_messages')
+          .collection('chats')
           .where('userId', isEqualTo: userId)
-          .where('isBookmarked', isEqualTo: true)
-          .orderBy('timestamp', descending: true)
           .get();
 
-      return querySnapshot.docs
-          .map((doc) => ChatMessageModel.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error getting bookmarked messages: $e');
+      final batch = _firestore.batch();
+      for (final doc in querySnapshot.docs) {
+        batch.delete(doc.reference);
       }
-      return [];
+      await batch.commit();
+
+      _messages.clear();
+      _totalQuestions = 0;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      if (kDebugMode) print('Error clearing chat history: $e');
     }
   }
 
   Future<void> deleteMessage(String messageId) async {
     try {
-      await _firestore
-          .collection('chat_messages')
-          .doc(messageId)
-          .delete();
+      await _firestore.collection('chats').doc(messageId).delete();
 
-      // Remove from local list
       _messages.removeWhere((msg) => msg.id == messageId);
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) {
-        print('Error deleting message: $e');
-      }
+      _error = e.toString();
+      notifyListeners();
+      if (kDebugMode) print('Error deleting message: $e');
     }
+  }
+
+  List<ChatMessageModel> getMessagesBySubject(String subject) {
+    return _messages.where((msg) => msg.subject == subject).toList();
+  }
+
+  List<String> getUniqueSubjects() {
+    return _messages
+        .map((msg) => msg.subject)
+        .where((subject) => subject.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  ChatMessageModel? getLastMessage() {
+    return _messages.isNotEmpty ? _messages.last : null;
+  }
+
+  List<ChatMessageModel> getRecentMessages({int limit = 10}) {
+    final sortedMessages = List<ChatMessageModel>.from(_messages);
+    sortedMessages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return sortedMessages.take(limit).toList();
   }
 
   void clearError() {
@@ -186,9 +194,21 @@ class ChatProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void clearMessages() {
-    _messages.clear();
-    _currentSessionId = null;
+  void addMessage(ChatMessageModel message) {
+    _messages.add(message);
+    if (message.type == MessageType.user) {
+      _totalQuestions++;
+    }
+    notifyListeners();
+  }
+
+  void removeMessage(String messageId) {
+    final removedMessage = _messages.firstWhere((msg) => msg.id == messageId);
+    _messages.removeWhere((msg) => msg.id == messageId);
+
+    if (removedMessage.type == MessageType.user && _totalQuestions > 0) {
+      _totalQuestions--;
+    }
     notifyListeners();
   }
 }
