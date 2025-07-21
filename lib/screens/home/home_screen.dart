@@ -8,6 +8,7 @@ import '../flashcards/flashcard_screen.dart';
 import '../quiz/quiz_screen.dart';
 import '../stats/stats_screen.dart';
 import '../profile/profile_screen.dart';
+import '../summarizer/summarizer_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -325,45 +326,77 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.5,
+              // Custom grid layout for 5 cards
+              Column(
                 children: [
-                  _buildQuickActionCard(
-                    context,
-                    'AI Tutor',
-                    'Ask questions & get help',
-                    Icons.school,
-                    Colors.blue,
-                        () => onNavigate(1),
+                  // First row - 2 cards
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickActionCard(
+                          context,
+                          'AI Tutor',
+                          'Ask questions & get help',
+                          Icons.school,
+                          Colors.blue,
+                              () => onNavigate(1),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildQuickActionCard(
+                          context,
+                          'AI Summarizer',
+                          'Create study notes',
+                          Icons.auto_awesome,
+                          Colors.teal,
+                              () =>
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (
+                                    context) => const SummarizerScreen()),
+                              ),
+                        ),
+                      ),
+                    ],
                   ),
-                  _buildQuickActionCard(
-                    context,
-                    'Flashcards',
-                    'Create study cards',
-                    Icons.style,
-                    Colors.green,
-                        () => onNavigate(2),
-                  ),
-                  _buildQuickActionCard(
-                    context,
-                    'Quiz',
-                    'Test your knowledge',
-                    Icons.quiz,
-                    Colors.purple,
-                        () => onNavigate(3),
-                  ),
-                  _buildQuickActionCard(
-                    context,
-                    'Study Stats',
-                    'Track progress',
-                    Icons.analytics,
-                    Colors.orange,
-                        () => onNavigate(4),
+                  const SizedBox(height: 12),
+                  // Second row - 3 cards
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickActionCard(
+                          context,
+                          'Flashcards',
+                          'Study cards',
+                          Icons.style,
+                          Colors.green,
+                              () => onNavigate(2),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildQuickActionCard(
+                          context,
+                          'Quiz',
+                          'Test knowledge',
+                          Icons.quiz,
+                          Colors.purple,
+                              () => onNavigate(3),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildQuickActionCard(
+                          context,
+                          'Study Stats',
+                          'Track progress',
+                          Icons.analytics,
+                          Colors.orange,
+                              () => onNavigate(4),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -414,7 +447,8 @@ class DashboardScreen extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.all(10),
+          height: 100,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Theme
                 .of(context)
@@ -444,19 +478,19 @@ class DashboardScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   icon,
                   color: color,
-                  size: 28,
+                  size: 20,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 title,
                 style: Theme
@@ -469,7 +503,7 @@ class DashboardScreen extends StatelessWidget {
                       .of(context)
                       .colorScheme
                       .onSurface,
-                  fontSize: 13,
+                  fontSize: 12,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -490,10 +524,10 @@ class DashboardScreen extends StatelessWidget {
                         .onSurface,
                     0.6,
                   ),
-                  fontSize: 11,
+                  fontSize: 10,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ],

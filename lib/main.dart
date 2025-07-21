@@ -12,6 +12,7 @@ import 'providers/flashcard_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/study_provider.dart';
 import 'providers/premium_provider.dart';
+import 'providers/summarizer_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -58,6 +59,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StudyProvider()),
         ChangeNotifierProvider(create: (_) => PremiumProvider()),
         ChangeNotifierProvider(create: (_) => ProgressProvider()),
+        ChangeNotifierProvider(create: (_) => SummarizerProvider()),
       ],
       child: MaterialApp(
         title: AppStrings.appName,

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
+import '../models/study_summary_model.dart';
 
 class AIService {
   // IMPORTANT: To use AI features, you need to set your OpenAI API key:
@@ -211,6 +212,45 @@ class AIService {
 
       final content = response.data['choices'][0]['message']['content'];
       return content.toString().trim();
+    });
+  }
+
+  Future<StudySummary> summarizeContent(String content, String subject) async {
+    if (!isConfigured) {
+      throw Exception(ApiConfig.validationMessage);
+    }
+
+    return _executeWithRetry(() async {
+      final response = await _dio.post(
+        ApiConfig.chatCompletionsEndpoint,
+        data: {
+          'model': ApiConfig.openAiModel,
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are an AI study assistant that creates structured study notes. '
+                  'Analyze the given content and create a comprehensive study summary. '
+                  'Format your response as JSON with the following structure:\n'
+                  '{\n'
+                  '  "title": "Descriptive title for the content",\n'
+                  '  "mainTopics": ["topic1", "topic2", "topic3"],\n'
+                  '  "keyDefinitions": {"term1": "definition1", "term2": "definition2"},\n'
+                  '  "importantFacts": ["fact1", "fact2", "fact3"]\n'
+                  '}\n'
+                  'Make it educational and well-structured for student learning.'
+            },
+            {
+              'role': 'user',
+              'content': 'Please summarize this content for studying:\n\n$content',
+            }
+          ],
+          'max_tokens': 1000,
+          'temperature': 0.7,
+        },
+      );
+
+      final aiResponse = response.data['choices'][0]['message']['content'];
+      return StudySummary.fromAIResponse(aiResponse, content, subject);
     });
   }
 
