@@ -14,6 +14,7 @@ import 'providers/study_provider.dart';
 import 'providers/premium_provider.dart';
 import 'providers/summarizer_provider.dart';
 import 'providers/voice_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -54,6 +55,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => FlashcardProvider()),
@@ -63,20 +65,23 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SummarizerProvider()),
         ChangeNotifierProvider(create: (_) => VoiceProvider()),
       ],
-      child: MaterialApp(
-        title: AppStrings.appName,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: AppConfig.enableDarkMode ? ThemeMode.system : ThemeMode
-            .light,
-        home: SplashScreen(isInitialized: firebaseInitialized),
-        debugShowCheckedModeBanner: false,
-        builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: const TextScaler.linear(1.0),
-            ),
-            child: child!,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: AppStrings.appName,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            home: SplashScreen(isInitialized: firebaseInitialized),
+            debugShowCheckedModeBanner: false,
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: const TextScaler.linear(1.0),
+                ),
+                child: child!,
+              );
+            },
           );
         },
       ),

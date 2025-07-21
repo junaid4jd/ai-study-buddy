@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../services/progress_service.dart';
 import '../../services/favourites_service.dart';
 import '../../utils/app_theme.dart';
@@ -16,7 +17,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsEnabled = true;
-  bool _darkModeEnabled = false;
   String _studyGoal = '60 minutes';
 
   int _calculateStreak(DateTime? lastLoginAt) {
@@ -331,18 +331,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                       ),
                     ),
-                    _buildSettingsItem(
-                      'Dark Mode',
-                      'Switch to dark theme',
-                      Icons.dark_mode_outlined,
-                      Switch(
-                        value: _darkModeEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _darkModeEnabled = value;
-                          });
-                        },
-                      ),
+                    Consumer<ThemeProvider>(
+                      builder: (context, themeProvider, child) {
+                        return _buildSettingsItem(
+                          'Theme',
+                          'Current: ${themeProvider.themeName}',
+                          themeProvider.themeIcon,
+                          const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () => _showThemeDialog(themeProvider),
+                        );
+                      },
                     ),
                     _buildSettingsItem(
                       'Daily Study Goal',
@@ -751,6 +749,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: const Text('Sign Out'),
               ),
             ],
+          ),
+    );
+  }
+
+  void _showThemeDialog(ThemeProvider themeProvider) {
+    final themeOptions = [
+      'System',
+      'Light',
+      'Dark',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Select Theme'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: themeOptions.map((theme) =>
+                  RadioListTile<String>(
+                    title: Text(theme),
+                    value: theme,
+                    groupValue: themeProvider.themeName,
+                    onChanged: (value) {
+                      if (value == 'System') {
+                        themeProvider.setThemeMode(ThemeMode.system);
+                      } else if (value == 'Light') {
+                        themeProvider.setThemeMode(ThemeMode.light);
+                      } else if (value == 'Dark') {
+                        themeProvider.setThemeMode(ThemeMode.dark);
+                      }
+                      Navigator.pop(context);
+                    },
+                  )).toList(),
+            ),
           ),
     );
   }

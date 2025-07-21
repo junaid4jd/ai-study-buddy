@@ -218,7 +218,7 @@ class AppTheme {
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.backgroundDark,
 
-      colorScheme: const ColorScheme.dark(
+      colorScheme: ColorScheme.dark(
         primary: AppColors.primary,
         secondary: AppColors.secondary,
         surface: AppColors.surfaceDark,
@@ -227,18 +227,28 @@ class AppTheme {
         onSecondary: Colors.white,
         onSurface: AppColors.textDark,
         onError: Colors.white,
+        background: AppColors.backgroundDark,
+        onBackground: AppColors.textDark,
+        outline: AppColors.borderDark,
+        outlineVariant: withOpacity(AppColors.borderDark, 0.5),
       ),
 
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textDark,
         elevation: 0,
         centerTitle: true,
         systemOverlayStyle: SystemUiOverlayStyle.light,
-        titleTextStyle: TextStyle(
+        titleTextStyle: const TextStyle(
           color: AppColors.textDark,
           fontSize: 20,
           fontWeight: FontWeight.w600,
+        ),
+        iconTheme: const IconThemeData(
+          color: AppColors.textDark,
+        ),
+        actionsIconTheme: const IconThemeData(
+          color: AppColors.textDark,
         ),
       ),
 
@@ -283,6 +293,12 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceDark,
+        hintStyle: TextStyle(
+          color: withOpacity(AppColors.textDark, 0.6),
+        ),
+        labelStyle: TextStyle(
+          color: withOpacity(AppColors.textDark, 0.8),
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.borderDark),
@@ -319,10 +335,10 @@ class AppTheme {
         shape: CircleBorder(),
       ),
 
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surfaceDark,
         selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textSecondary,
+        unselectedItemColor: withOpacity(AppColors.textDark, 0.6),
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
@@ -330,6 +346,54 @@ class AppTheme {
       dividerTheme: const DividerThemeData(
         color: AppColors.borderDark,
         thickness: 1,
+      ),
+
+      switchTheme: SwitchThemeData(
+        thumbColor: MaterialStateProperty.resolveWith<Color>((states) {
+          if (states.contains(MaterialState.selected)) {
+            return AppColors.primary;
+          }
+          return AppColors.textSecondary;
+        }),
+        trackColor: MaterialStateProperty.resolveWith<Color>((states) {
+          if (states.contains(MaterialState.selected)) {
+            return withOpacity(AppColors.primary, 0.5);
+          }
+          return AppColors.borderDark;
+        }),
+      ),
+
+      tabBarTheme: TabBarTheme(
+        labelColor: AppColors.textDark,
+        unselectedLabelColor: withOpacity(AppColors.textDark, 0.7),
+        indicator: const UnderlineTabIndicator(
+          borderSide: BorderSide(
+            color: AppColors.primary,
+            width: 2.0,
+          ),
+        ),
+      ),
+
+      iconTheme: const IconThemeData(
+        color: AppColors.textDark,
+        size: 24,
+      ),
+
+      primaryIconTheme: const IconThemeData(
+        color: AppColors.primary,
+        size: 24,
+      ),
+
+      listTileTheme: ListTileThemeData(
+        textColor: AppColors.textDark,
+        iconColor: AppColors.textDark,
+        titleTextStyle: const TextStyle(
+          color: AppColors.textDark,
+          fontWeight: FontWeight.w500,
+        ),
+        subtitleTextStyle: TextStyle(
+          color: withOpacity(AppColors.textDark, 0.7),
+        ),
       ),
 
       textTheme: const TextTheme(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../services/progress_service.dart';
 import '../../utils/app_theme.dart';
 import '../chat/chat_screen.dart';
@@ -138,6 +139,17 @@ class DashboardScreen extends StatelessWidget {
         title: const Text('AI Study Companion'),
         centerTitle: true,
         actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, child) {
+              return IconButton(
+                icon: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons
+                    .dark_mode),
+                onPressed: () {
+                  themeProvider.toggleTheme();
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
