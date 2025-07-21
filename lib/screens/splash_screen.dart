@@ -80,35 +80,37 @@ class _SplashScreenState extends State<SplashScreen>
     // Wait for minimum splash duration
     await Future.delayed(const Duration(seconds: 3));
 
-    if (mounted) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!mounted) return;
 
-      // Wait for auth provider to initialize
-      while (!authProvider.isInitialized) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (!mounted) return;
-      }
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      final prefs = await SharedPreferences.getInstance();
-      final isOnboardingCompleted = prefs.getBool('onboarding_completed') ??
-          false;
+    // Wait for auth provider to initialize
+    while (!authProvider.isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+    }
 
-      // Navigate based on auth state
-      if (isOnboardingCompleted) {
-        if (authProvider.isLoggedIn) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
-        } else {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-          );
-        }
+    final prefs = await SharedPreferences.getInstance();
+    final isOnboardingCompleted = prefs.getBool('onboarding_completed') ??
+        false;
+
+    if (!mounted) return;
+
+    // Navigate based on auth state
+    if (isOnboardingCompleted) {
+      if (authProvider.isLoggedIn) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
       } else {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
       }
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+      );
     }
   }
 
@@ -151,7 +153,7 @@ class _SplashScreenState extends State<SplashScreen>
                               borderRadius: BorderRadius.circular(30),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: Colors.black.withValues(alpha: 0.2),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -188,7 +190,7 @@ class _SplashScreenState extends State<SplashScreen>
               Text(
                 'Your AI-powered learning companion',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withAlpha(230),
                 ),
               ),
 
@@ -244,11 +246,11 @@ class _AnimatedLoadingDots extends StatelessWidget {
             height: dotSize,
             margin: EdgeInsets.symmetric(horizontal: dotSpacing / 2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(dotOpacity),
+              color: Colors.white.withAlpha((dotOpacity * 255).round()),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),

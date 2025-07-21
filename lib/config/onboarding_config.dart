@@ -17,46 +17,46 @@ class OnboardingConfig {
   static const List<OnboardingPageConfig> pages = [
     // 🤖 PAGE 1: AI Features
     OnboardingPageConfig(
-      title: "🤖 AI-Powered Learning",
-      subtitle: "Your Personal Study Assistant",
-      description: "Get instant answers to your questions with our advanced AI tutor. Learn any subject with personalized explanations tailored to your learning style.",
+      title: "🤖 AI Study Buddy",
+      subtitle: "Smart Learning Assistant",
+      description: "Get instant help with homework, explanations, and study guidance powered by AI!",
       icon: Icons.psychology,
-      gradientColors: [AppColors.primary, AppColors.primaryLight],
+      gradientColors: [Color(0xFF667EEA), Color(0xFF764BA2)],
       features: [
-        "Smart AI chat tutor",
-        "Subject-specific assistance",
-        "24/7 availability",
-        "Personalized explanations"
+        "✨ Instant AI answers",
+        "📚 Smart explanations",
+        "🎯 Personalized help",
+        "⚡ 24/7 available"
       ],
     ),
 
     // 📚 PAGE 2: Study Tools  
     OnboardingPageConfig(
-      title: "📚 Smart Study Tools",
-      subtitle: "Flashcards & Quizzes Made Easy",
-      description: "Create custom flashcards and take AI-generated quizzes on any topic. Track your progress and identify areas that need more focus.",
-      icon: Icons.quiz,
-      gradientColors: [AppColors.secondary, AppColors.secondaryLight],
+      title: "📚 Study Tools",
+      subtitle: "Learn Smarter",
+      description: "Create flashcards and take quizzes automatically. Make studying fun and effective!",
+      icon: Icons.auto_awesome,
+      gradientColors: [Color(0xFFF093FB), Color(0xFFF5576C)],
       features: [
-        "AI-generated flashcards",
-        "Custom quiz creation",
-        "Progress tracking",
-        "Spaced repetition"
+        "🃏 Auto flashcards",
+        "🎮 Fun quizzes",
+        "📈 Track progress",
+        "🏆 Earn rewards"
       ],
     ),
 
     // 🎯 PAGE 3: Goals & Achievement
     OnboardingPageConfig(
-      title: "🎯 Achieve Your Goals",
-      subtitle: "Study Smarter, Not Harder",
-      description: "Set study goals, track your learning streaks, and celebrate your achievements. Turn studying into an engaging and rewarding experience.",
-      icon: Icons.emoji_events,
-      gradientColors: [AppColors.accent, AppColors.accentLight],
+      title: "🎯 Your Success",
+      subtitle: "Achieve Goals",
+      description: "Set goals, build streaks, and celebrate your learning achievements!",
+      icon: Icons.rocket_launch,
+      gradientColors: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
       features: [
-        "Goal setting & tracking",
-        "Learning streaks",
-        "Achievement badges",
-        "Study analytics"
+        "🎯 Set study goals",
+        "🔥 Build streaks",
+        "🏅 Win badges",
+        "📊 See growth"
       ],
     ),
   ];
@@ -77,12 +77,12 @@ class OnboardingConfig {
   static const Curve animationCurve = Curves.easeInOut;
 
   /// Layout settings
-  static const double iconSize = 60.0;
-  static const double iconContainerSize = 120.0;
-  static const double titleFontSize = 28.0;
-  static const double subtitleFontSize = 18.0;
-  static const double descriptionFontSize = 16.0;
-  static const double featureFontSize = 14.0;
+  static const double iconSize = 50.0;
+  static const double iconContainerSize = 100.0;
+  static const double titleFontSize = 24.0;
+  static const double subtitleFontSize = 16.0;
+  static const double descriptionFontSize = 14.0;
+  static const double featureFontSize = 13.0;
 }
 
 /// Data class for onboarding page configuration

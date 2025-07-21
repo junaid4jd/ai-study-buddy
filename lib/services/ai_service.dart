@@ -4,10 +4,6 @@ import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
 
 class AIService {
-  static const String _baseUrl = 'https://api.openai.com/v1';
-  static const String _apiKey = String.fromEnvironment(
-      'OPENAI_API_KEY', defaultValue: '');
-
   // IMPORTANT: To use AI features, you need to set your OpenAI API key:
   // 
   // Method 1 - Run with API key (Recommended for development):
@@ -38,6 +34,27 @@ class AIService {
   bool get isConfigured => ApiConfig.isApiKeyConfigured;
 
   String get configurationMessage => ApiConfig.validationMessage;
+
+  // Helper method to clean JSON response from markdown formatting
+  String _cleanJsonResponse(String response) {
+    String cleaned = response.trim();
+
+    // Remove markdown code block markers
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.replaceFirst('```json', '').trim();
+    }
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replaceFirst('```', '').trim();
+    }
+    if (cleaned.endsWith('```')) {
+      cleaned =
+          cleaned
+              .replaceRange(cleaned.lastIndexOf('```'), cleaned.length, '')
+              .trim();
+    }
+
+    return cleaned;
+  }
 
   Future<String> generateTutorResponse(String question, String subject) async {
     if (!isConfigured) {
@@ -105,7 +122,8 @@ class AIService {
       );
 
       final content = response.data['choices'][0]['message']['content'];
-      final jsonContent = jsonDecode(content);
+      final cleanedContent = _cleanJsonResponse(content);
+      final jsonContent = jsonDecode(cleanedContent);
 
       return {
         'question': jsonContent['question']?.toString() ?? 'Generated question',
@@ -150,7 +168,8 @@ class AIService {
       );
 
       final content = response.data['choices'][0]['message']['content'];
-      final List<dynamic> jsonContent = jsonDecode(content);
+      final cleanedContent = _cleanJsonResponse(content);
+      final List<dynamic> jsonContent = jsonDecode(cleanedContent);
 
       return jsonContent.map((question) =>
       {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/progress_service.dart';
+import '../../services/favourites_service.dart';
 import '../../utils/app_theme.dart';
 import '../../services/ai_service.dart';
 
@@ -14,6 +16,8 @@ class FlashcardScreen extends StatefulWidget {
 class _FlashcardScreenState extends State<FlashcardScreen>
     with TickerProviderStateMixin {
   final AIService _aiService = AIService();
+  final ProgressService _progressService = ProgressService();
+  final FavouritesService _favouritesService = FavouritesService();
   final _topicController = TextEditingController();
   List<Flashcard> _flashcards = [];
   bool _isGenerating = false;
@@ -51,6 +55,7 @@ class _FlashcardScreenState extends State<FlashcardScreen>
       parent: _flipController,
       curve: Curves.easeInOut,
     ));
+    _syncFavourites();
   }
 
   @override
@@ -101,6 +106,13 @@ class _FlashcardScreenState extends State<FlashcardScreen>
         _flipController.reset();
       });
 
+      // Track flashcard creation progress
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.user != null) {
+        await _progressService.trackFlashcardCreation(
+            authProvider.user!.uid, studyTime: 3);
+      }
+
       _topicController.clear();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -146,6 +158,13 @@ class _FlashcardScreenState extends State<FlashcardScreen>
       _flipController.reverse();
     } else {
       _flipController.forward();
+
+      // Track flashcard review when showing answer
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.user != null) {
+        _progressService.trackFlashcardReview(
+            authProvider.user!.uid, studyTime: 1);
+      }
     }
     setState(() {
       _isFlipped = !_isFlipped;
@@ -184,6 +203,357 @@ class _FlashcardScreenState extends State<FlashcardScreen>
       _isFlipped = false;
       _flipController.reset();
     });
+    _syncFavourites();
+  }
+
+  void _showFlashcardOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) =>
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme
+                  .of(context)
+                  .colorScheme
+                  .surface,
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme
+                        .of(context)
+                        .colorScheme
+                        .outline
+                        .withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Flashcard Options',
+                  style: Theme
+                      .of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Clear All Cards Option
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(Icons.clear_all, color: Colors.red),
+                  ),
+                  title: const Text('Clear All Cards'),
+                  subtitle: const Text('Remove all flashcards'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _clearAllCards();
+                  },
+                ),
+
+                // Export Cards Option
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(Icons.download, color: Colors.green),
+                  ),
+                  title: const Text('Export Cards'),
+                  subtitle: const Text('Save flashcards to file'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _exportCards();
+                  },
+                ),
+
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _clearAllCards() {
+    if (_flashcards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No flashcards to clear'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Clear All Cards'),
+            content: const Text(
+                'Are you sure you want to delete all flashcards? This action cannot be undone.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _flashcards.clear();
+                    _currentIndex = 0;
+                    _isFlipped = false;
+                    _flipController.reset();
+                  });
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('All flashcards cleared'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Clear All'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _exportCards() async {
+    if (_flashcards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No flashcards to export'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    // TODO: Implement actual export functionality
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Exported ${_flashcards.length} flashcards successfully'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(
+          label: 'View',
+          textColor: Colors.white,
+          onPressed: () {
+            // TODO: Open exported file
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorfulSubjectChip(String subject, bool isSelected, int index) {
+    final chipColor = _getSubjectColor(subject);
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedSubject = subject;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              chipColor,
+              chipColor.withOpacity(0.7),
+            ],
+          )
+              : null,
+          color: isSelected ? null : chipColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: chipColor.withOpacity(isSelected ? 1.0 : 0.3),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: chipColor.withOpacity(0.3),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: const Offset(0, 3),
+            ),
+          ] : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _getSubjectIcon(subject),
+              color: isSelected ? Colors.white : chipColor,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              subject,
+              style: TextStyle(
+                color: isSelected ? Colors.white : chipColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getSubjectColor(String subject) {
+    switch (subject) {
+      case 'General':
+        return Colors.grey.shade600;
+      case 'Mathematics':
+        return Colors.blue;
+      case 'Science':
+        return Colors.green;
+      case 'History':
+        return Colors.brown;
+      case 'English':
+        return Colors.purple;
+      case 'Physics':
+        return Colors.indigo;
+      case 'Chemistry':
+        return Colors.orange;
+      case 'Biology':
+        return Colors.teal;
+      case 'Computer Science':
+        return Colors.cyan;
+      case 'Economics':
+        return Colors.amber.shade700;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getSubjectIcon(String subject) {
+    switch (subject) {
+      case 'General':
+        return Icons.lightbulb_outline;
+      case 'Mathematics':
+        return Icons.functions;
+      case 'Science':
+        return Icons.science;
+      case 'History':
+        return Icons.account_balance;
+      case 'English':
+        return Icons.menu_book;
+      case 'Physics':
+        return Icons.flash_on;
+      case 'Chemistry':
+        return Icons.biotech;
+      case 'Biology':
+        return Icons.eco;
+      case 'Computer Science':
+        return Icons.computer;
+      case 'Economics':
+        return Icons.trending_up;
+      default:
+        return Icons.school;
+    }
+  }
+
+  void _toggleFavourite(int index) {
+    setState(() {
+      _flashcards[index].isFavourite = !_flashcards[index].isFavourite;
+    });
+
+    _syncFavourites();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              _flashcards[index].isFavourite ? Icons.favorite : Icons
+                  .favorite_border,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _flashcards[index].isFavourite
+                  ? 'Added to favourites'
+                  : 'Removed from favourites',
+            ),
+          ],
+        ),
+        backgroundColor: _flashcards[index].isFavourite ? Colors.red : Colors
+            .grey,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _exportSingleCard(int index) async {
+    final card = _flashcards[index];
+
+    // Placeholder export functionality
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.download_done, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text('Export feature coming soon for "${card.topic}"')),
+          ],
+        ),
+        backgroundColor: Colors.blue,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _syncFavourites() {
+    _favouritesService.syncFavourites(_flashcards);
   }
 
   @override
@@ -193,33 +563,10 @@ class _FlashcardScreenState extends State<FlashcardScreen>
         title: const Text('Flashcards'),
         centerTitle: true,
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              setState(() {
-                _selectedSubject = value;
-              });
-            },
-            itemBuilder: (context) =>
-                _subjects
-                    .map((subject) =>
-                    PopupMenuItem(
-                      value: subject,
-              child: Text(subject),
-            ))
-                .toList(),
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Chip(
-                label: Text(
-                  _selectedSubject,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                backgroundColor: Theme
-                    .of(context)
-                    .colorScheme
-                    .primaryContainer,
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () => _showFlashcardOptions(),
+            tooltip: 'Flashcard Options',
           ),
         ],
       ),
@@ -256,6 +603,42 @@ class _FlashcardScreenState extends State<FlashcardScreen>
               ),
             ),
 
+          // Colorful Subject Selection
+          Container(
+            height: 70,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: Theme
+                  .of(context)
+                  .colorScheme
+                  .surface,
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme
+                      .of(context)
+                      .colorScheme
+                      .outline
+                      .withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _subjects.length,
+              itemBuilder: (context, index) {
+                final subject = _subjects[index];
+                final isSelected = subject == _selectedSubject;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: _buildColorfulSubjectChip(subject, isSelected, index),
+                );
+              },
+            ),
+          ),
+
           // Generation Form
           Container(
             padding: const EdgeInsets.all(16),
@@ -264,28 +647,122 @@ class _FlashcardScreenState extends State<FlashcardScreen>
                 Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: _topicController,
-                        decoration: InputDecoration(
-                          hintText: 'Enter a topic to generate flashcard...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme
+                              .of(context)
+                              .colorScheme
+                              .surfaceVariant
+                              .withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Theme
+                                .of(context)
+                                .colorScheme
+                                .outline
+                                .withOpacity(0.2),
+                            width: 1,
                           ),
-                          prefixIcon: const Icon(Icons.lightbulb_outline),
                         ),
-                        onSubmitted: (_) => _generateFlashcard(),
+                        child: TextField(
+                          controller: _topicController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter topic for ${_selectedSubject
+                                .toLowerCase()} flashcard...',
+                            hintStyle: TextStyle(
+                              color: Theme
+                                  .of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.5),
+                              fontSize: 15,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.lightbulb_outline,
+                              color: Theme
+                                  .of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.4),
+                              size: 20,
+                            ),
+                          ),
+                          onSubmitted: (_) => _generateFlashcard(),
+                          style: const TextStyle(fontSize: 15),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _isGenerating ? null : _generateFlashcard,
-                      child: _isGenerating
-                          ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                          : const Text('Generate'),
+                    Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: !_isGenerating
+                            ? LinearGradient(
+                          colors: [
+                            Theme
+                                .of(context)
+                                .colorScheme
+                                .primary,
+                            Theme
+                                .of(context)
+                                .colorScheme
+                                .primary
+                                .withOpacity(0.8),
+                          ],
+                        )
+                            : null,
+                        color: _isGenerating
+                            ? Theme
+                            .of(context)
+                            .colorScheme
+                            .outline
+                            .withOpacity(0.3)
+                            : null,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: !_isGenerating ? [
+                          BoxShadow(
+                            color: Theme
+                                .of(context)
+                                .colorScheme
+                                .primary
+                                .withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: _isGenerating ? null : _generateFlashcard,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: _isGenerating
+                                ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                                : const Text(
+                              'Generate',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -385,32 +862,38 @@ class _FlashcardScreenState extends State<FlashcardScreen>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery
+              .of(context)
+              .size
+              .height - 300,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
                 color: AppTheme.withOpacity(Theme
                     .of(context)
                     .colorScheme
                     .primary, 0.1),
-                borderRadius: BorderRadius.circular(40),
+                borderRadius: BorderRadius.circular(32),
               ),
               child: Icon(
                 Icons.style,
-                size: 40,
+                size: 32,
                 color: Theme
                     .of(context)
                     .colorScheme
                     .primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Text(
               'No flashcards yet',
               style: Theme
@@ -437,10 +920,26 @@ class _FlashcardScreenState extends State<FlashcardScreen>
                         .onSurface, 0.7),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            Text(
+              'Try these topics:',
+              style: Theme
+                  .of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme
+                    .of(context)
+                    .colorScheme
+                    .primary,
+              ),
+            ),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
+              alignment: WrapAlignment.center,
               children: [
                 _buildSuggestionChip('Photosynthesis'),
                 _buildSuggestionChip('Quadratic equations'),
@@ -455,15 +954,68 @@ class _FlashcardScreenState extends State<FlashcardScreen>
   }
 
   Widget _buildSuggestionChip(String text) {
-    return ActionChip(
-      label: Text(text),
-      onPressed: () {
+    final suggestions = {
+      'Photosynthesis': {'color': Colors.green, 'icon': Icons.eco},
+      'Quadratic equations': {'color': Colors.blue, 'icon': Icons.functions},
+      'World War 2': {'color': Colors.brown, 'icon': Icons.military_tech},
+      'Shakespeare': {'color': Colors.purple, 'icon': Icons.theater_comedy},
+    };
+
+    final suggestion = suggestions[text] ??
+        {'color': Colors.grey, 'icon': Icons.lightbulb_outline};
+    final color = suggestion['color'] as Color;
+    final icon = suggestion['icon'] as IconData;
+
+    return GestureDetector(
+      onTap: () {
         _topicController.text = text;
       },
-      backgroundColor: AppTheme.withOpacity(Theme
-          .of(context)
-          .colorScheme
-          .primary, 0.1),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color,
+              color.withOpacity(0.7),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              blurRadius: 6,
+              spreadRadius: 1,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -496,17 +1048,28 @@ class _FlashcardScreenState extends State<FlashcardScreen>
                       .primary,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '${flashcard.subject} • ${flashcard.topic}',
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: Text(
+                    '${flashcard.subject} • ${flashcard.topic}',
+                    style: Theme
+                        .of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
+                if (flashcard.isFavourite)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    child: Icon(
+                      Icons.favorite,
+                      size: 16,
+                      color: Colors.red,
+                    ),
+                  ),
                 PopupMenuButton(
                   icon: const Icon(Icons.more_vert, size: 16),
                   itemBuilder: (context) =>
@@ -521,10 +1084,45 @@ class _FlashcardScreenState extends State<FlashcardScreen>
                         ],
                       ),
                     ),
+                    PopupMenuItem(
+                      value: 'favourite',
+                      child: Row(
+                        children: [
+                          Icon(
+                            flashcard.isFavourite
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: flashcard.isFavourite
+                                ? Colors.red
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            flashcard.isFavourite
+                                ? 'Unfavourite'
+                                : 'Favourite',
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'export',
+                      child: const Row(
+                        children: [
+                          Icon(Icons.download, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text('Export'),
+                        ],
+                      ),
+                    ),
                   ],
                   onSelected: (value) {
                     if (value == 'delete') {
                       _deleteCard(_currentIndex);
+                    } else if (value == 'favourite') {
+                      _toggleFavourite(_currentIndex);
+                    } else if (value == 'export') {
+                      _exportSingleCard(_currentIndex);
                     }
                   },
                 ),
@@ -536,101 +1134,121 @@ class _FlashcardScreenState extends State<FlashcardScreen>
 
           // Flashcard
           Expanded(
-            child: GestureDetector(
-              onTap: _flipCard,
-              child: AnimatedBuilder(
-                animation: _flipAnimation,
-                builder: (context, child) {
-                  final isShowingFront = _flipAnimation.value < 0.5;
-                  return Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.001)
-                      ..rotateY(_flipAnimation.value * 3.14159),
-                    child: Card(
-                      elevation: 8,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: isShowingFront
-                                ? [
-                              Theme
-                                  .of(context)
-                                  .colorScheme
-                                  .primary,
-                              Theme
-                                  .of(context)
-                                  .colorScheme
-                                  .secondary,
-                            ]
-                                : [
-                              Theme
-                                  .of(context)
-                                  .colorScheme
-                                  .tertiary,
-                              Theme
-                                  .of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                            ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  onTap: _flipCard,
+                  child: AnimatedBuilder(
+                    animation: _flipAnimation,
+                    builder: (context, child) {
+                      final isShowingFront = _flipAnimation.value < 0.5;
+                      return Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..setEntry(3, 2, 0.001)
+                          ..rotateY(_flipAnimation.value * 3.14159),
+                        child: Card(
+                          elevation: 8,
+                          child: Container(
+                            width: double.infinity,
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight * 0.6,
+                              maxHeight: constraints.maxHeight,
+                            ),
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: isShowingFront
+                                    ? [
+                                  Theme
+                                      .of(context)
+                                      .colorScheme
+                                      .primary,
+                                  Theme
+                                      .of(context)
+                                      .colorScheme
+                                      .secondary,
+                                ]
+                                    : [
+                                  Theme
+                                      .of(context)
+                                      .colorScheme
+                                      .tertiary,
+                                  Theme
+                                      .of(context)
+                                      .colorScheme
+                                      .primaryContainer,
+                                ],
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isShowingFront ? Icons.help_outline : Icons
+                                      .lightbulb,
+                                  size: 24,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  isShowingFront ? 'Question' : 'Answer',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Flexible(
+                                  child: Container(
+                                    constraints: BoxConstraints(
+                                      maxHeight: constraints.maxHeight * 0.5,
+                                    ),
+                                    child: SingleChildScrollView(
+                                      child: Transform(
+                                        alignment: Alignment.center,
+                                        transform: Matrix4.identity()
+                                          ..rotateY(
+                                              isShowingFront ? 0 : 3.14159),
+                                        child: Text(
+                                          isShowingFront
+                                              ? flashcard.question
+                                              : flashcard.answer,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap to ${isShowingFront
+                                      ? 'reveal answer'
+                                      : 'show question'}',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              isShowingFront ? Icons.help_outline : Icons
-                                  .lightbulb,
-                              size: 32,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              isShowingFront ? 'Question' : 'Answer',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Transform(
-                              alignment: Alignment.center,
-                              transform: Matrix4.identity()
-                                ..rotateY(isShowingFront ? 0 : 3.14159),
-                              child: Text(
-                                isShowingFront ? flashcard.question : flashcard
-                                    .answer,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Tap to ${isShowingFront
-                                  ? 'reveal answer'
-                                  : 'show question'}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -646,6 +1264,7 @@ class Flashcard {
   final String subject;
   final String topic;
   final DateTime createdAt;
+  bool isFavourite;
 
   Flashcard({
     required this.id,
@@ -654,5 +1273,6 @@ class Flashcard {
     required this.subject,
     required this.topic,
     required this.createdAt,
+    this.isFavourite = false,
   });
 }

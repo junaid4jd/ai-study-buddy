@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/progress_service.dart';
+import '../../services/favourites_service.dart';
 import '../../utils/app_theme.dart';
 import '../auth/login_screen.dart';
+import '../favourites/favourites_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -98,42 +101,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        if (userModel != null) ...[
+                        // Real stats from progress service
+                        if (user != null)
+                          FutureBuilder<UserStats?>(
+                            future: ProgressService().getUserStats(user.uid),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Row(
+                                  mainAxisAlignment: MainAxisAlignment
+                                      .spaceEvenly,
+                                  children: [
+                                    CircularProgressIndicator(),
+                                  ],
+                                );
+                              }
+
+                              if (snapshot.hasError) {
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment
+                                      .spaceEvenly,
+                                  children: [
+                                    _buildStatItem('Questions Used', '0',
+                                        Icons.help_outline),
+                                    _buildStatItem('Study Streak', '0 days',
+                                        Icons.local_fire_department),
+                                    _buildStatItem('Member Since', 'Today',
+                                        Icons.calendar_today),
+                                  ],
+                                );
+                              }
+
+                              final stats = snapshot.data;
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment
+                                    .spaceEvenly,
+                                children: [
+                                  _buildStatItem(
+                                    'Questions Used',
+                                    '${stats?.totalQuestionsAsked ?? 0}',
+                                    Icons.help_outline,
+                                  ),
+                                  _buildStatItem(
+                                    'Study Streak',
+                                    '${stats?.currentStreak ?? 0} days',
+                                    Icons.local_fire_department,
+                                  ),
+                                  _buildStatItem(
+                                    'Member Since',
+                                    _formatDate(userModel?.createdAt ??
+                                        stats?.createdAt),
+                                    Icons.calendar_today,
+                                  ),
+                                ],
+                              );
+                            },
+                          )
+                        else
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               _buildStatItem(
-                                'Questions Used',
-                                '${userModel.questionsUsed}',
-                                Icons.help_outline,
-                              ),
-                              _buildStatItem(
-                                'Study Streak',
-                                '${_calculateStreak(
-                                    userModel.lastLoginAt)} days',
-                                Icons.local_fire_department,
-                              ),
-                              _buildStatItem(
-                                'Member Since',
-                                _formatDate(userModel.createdAt),
-                                Icons.calendar_today,
-                              ),
+                                  'Questions Used', '0', Icons.help_outline),
+                              _buildStatItem('Study Streak', '0 days',
+                                  Icons.local_fire_department),
+                              _buildStatItem('Member Since', 'Today',
+                                  Icons.calendar_today),
                             ],
                           ),
-                        ] else
-                          ...[
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _buildStatItem(
-                                    'Questions Used', '0', Icons.help_outline),
-                                _buildStatItem('Study Streak', '0 days',
-                                    Icons.local_fire_department),
-                                _buildStatItem('Member Since', 'Today',
-                                    Icons.calendar_today),
-                              ],
-                            ),
-                          ],
                       ],
                     ),
                   ),
@@ -143,50 +178,124 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // Study Statistics
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Study Statistics',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(
-                        fontWeight: FontWeight.bold,
+            // Study Statistics - Real Data
+            Consumer<AuthProvider>(
+              builder: (context, authProvider, child) {
+                if (authProvider.user == null) {
+                  return const SizedBox.shrink();
+                }
+
+                return FutureBuilder<List<dynamic>>(
+                  future: Future.wait([
+                    ProgressService().getTodaysProgress(authProvider.user!.uid),
+                    ProgressService().getUserStats(authProvider.user!.uid),
+                    ProgressService().getWeeklyProgress(authProvider.user!.uid),
+                  ]),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Study Statistics',
+                                style: Theme
+                                    .of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _buildProgressItem(
+                                  'Today\'s Progress', 0, 60, 'minutes',
+                                  Colors.blue),
+                              const SizedBox(height: 12),
+                              _buildProgressItem(
+                                  'Weekly Goal', 0, 7, 'days', Colors.green),
+                              const SizedBox(height: 12),
+                              _buildProgressItem(
+                                  'Flashcards Created', 0, 50, 'cards',
+                                  Colors.orange),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    final results = snapshot.data;
+                    final todayProgress = results?[0] as DailyProgress?;
+                    final userStats = results?[1] as UserStats?;
+                    final weeklyProgress = results?[2] as List<
+                        DailyProgress>? ?? [];
+
+                    final todayMinutes = todayProgress?.totalStudyTime ?? 0;
+                    final activeDaysThisWeek = weeklyProgress.where((day) =>
+                    day.totalStudyTime > 0 || day.questionsAsked > 0 ||
+                        day.flashcardsCreated > 0 || day.quizzesTaken > 0)
+                        .length;
+                    final totalFlashcards = userStats?.totalFlashcardsCreated ??
+                        0;
+
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Study Statistics',
+                              style: Theme
+                                  .of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildProgressItem(
+                              'Today\'s Progress',
+                              todayMinutes,
+                              60,
+                              'minutes',
+                              Colors.blue,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildProgressItem(
+                              'Weekly Goal',
+                              activeDaysThisWeek,
+                              7,
+                              'days',
+                              Colors.green,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildProgressItem(
+                              'Flashcards Created',
+                              totalFlashcards,
+                              50,
+                              'cards',
+                              Colors.orange,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildProgressItem(
-                      'Today\'s Progress',
-                      30,
-                      60,
-                      'minutes',
-                      Colors.blue,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildProgressItem(
-                      'Weekly Goal',
-                      4,
-                      7,
-                      'days',
-                      Colors.green,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildProgressItem(
-                      'Flashcards Mastered',
-                      23,
-                      50,
-                      'cards',
-                      Colors.orange,
-                    ),
-                  ],
-                ),
-              ),
+                    );
+                  },
+                );
+              },
             ),
 
             const SizedBox(height: 24),
@@ -241,6 +350,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Icons.schedule_outlined,
                       const Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: _showStudyGoalDialog,
+                    ),
+                    _buildSettingsItem(
+                      'Favourites',
+                      'View your favourited flashcards',
+                      Icons.favorite_border,
+                      const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (
+                              context) => const FavouritesScreen()),
+                        );
+                      },
                     ),
                     _buildSettingsItem(
                       'About',

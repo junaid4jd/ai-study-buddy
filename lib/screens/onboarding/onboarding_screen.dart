@@ -12,47 +12,19 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
+class _OnboardingScreenState extends State<OnboardingScreen> {
   late PageController _pageController;
-  late AnimationController _animationController;
-  late Animation<double> _slideAnimation;
-  late Animation<double> _fadeAnimation;
-
   int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
-    _animationController = AnimationController(
-      duration: OnboardingConfig.animationDuration,
-      vsync: this,
-    );
-
-    _slideAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: OnboardingConfig.animationCurve,
-    ));
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: OnboardingConfig.animationCurve,
-    ));
-
-    _animationController.forward();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
@@ -85,167 +57,102 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: OnboardingConfig.pages[_currentPage].gradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header with Skip button
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Logo/App name
-                    FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.school,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            AppStrings.appName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Skip button
-                    if (_currentPage < OnboardingConfig.pages.length - 1)
-                      FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: TextButton(
-                          onPressed: _skipOnboarding,
-                          child: Text(
-                            OnboardingConfig.skipButtonText,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Page content
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentPage = index;
-                    });
-                    _animationController.reset();
-                    _animationController.forward();
-                  },
-                  itemCount: OnboardingConfig.pages.length,
-                  itemBuilder: (context, index) {
-                    return _OnboardingPageWidget(
-                      pageConfig: OnboardingConfig.pages[index],
-                      slideAnimation: _slideAnimation,
-                      fadeAnimation: _fadeAnimation,
-                    );
-                  },
-                ),
-              ),
-
-              // Bottom section with indicators and buttons
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    // Page indicators
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        OnboardingConfig.pages.length,
-                        (index) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: _currentPage == index ? 24 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: _currentPage == index
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header with Skip button
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Skip button
+                  if (_currentPage < OnboardingConfig.pages.length - 1)
+                    TextButton(
+                      onPressed: _skipOnboarding,
+                      child: Text(
+                        OnboardingConfig.skipButtonText,
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
+                ],
+              ),
+            ),
 
-                    const SizedBox(height: 32),
+            // Page content
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemCount: OnboardingConfig.pages.length,
+                itemBuilder: (context, index) {
+                  return _OnboardingPageWidget(
+                    pageConfig: OnboardingConfig.pages[index],
+                  );
+                },
+              ),
+            ),
 
-                    // Action buttons
-                    Row(
-                      children: [
-                        // Previous button
-                        if (_currentPage > 0)
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                _pageController.previousPage(
-                                  duration: OnboardingConfig
-                                      .pageTransitionDuration,
-                                  curve: Curves.easeInOut,
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: const BorderSide(color: Colors.white),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                OnboardingConfig.previousButtonText,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
+            // Bottom section with indicators and buttons
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  // Page indicators
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      OnboardingConfig.pages.length,
+                          (index) =>
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: _currentPage == index ? 24 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _currentPage == index
+                                  ? AppColors.primary
+                                  : Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
 
-                        if (_currentPage > 0) const SizedBox(width: 16),
+                  const SizedBox(height: 32),
 
-                        // Next/Get Started button
+                  // Action buttons
+                  Row(
+                    children: [
+                      // Previous button
+                      if (_currentPage > 0)
                         Expanded(
-                          flex: _currentPage == 0 ? 1 : 1,
-                          child: ElevatedButton(
-                            onPressed: _nextPage,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: OnboardingConfig
-                                  .pages[_currentPage]
-                                  .gradientColors
-                                  .first,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              _pageController.previousPage(
+                                duration: OnboardingConfig
+                                    .pageTransitionDuration,
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: BorderSide(color: AppColors.primary),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              elevation: 0,
                             ),
                             child: Text(
-                              _currentPage == OnboardingConfig.pages.length - 1
-                                  ? OnboardingConfig.getStartedButtonText
-                                  : OnboardingConfig.nextButtonText,
+                              OnboardingConfig.previousButtonText,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -253,13 +160,40 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+
+                      if (_currentPage > 0) const SizedBox(width: 16),
+
+                      // Next/Get Started button
+                      Expanded(
+                        flex: _currentPage == 0 ? 1 : 1,
+                        child: ElevatedButton(
+                          onPressed: _nextPage,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            _currentPage == OnboardingConfig.pages.length - 1
+                                ? OnboardingConfig.getStartedButtonText
+                                : OnboardingConfig.nextButtonText,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -269,131 +203,92 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 // Individual onboarding page widget
 class _OnboardingPageWidget extends StatelessWidget {
   final OnboardingPageConfig pageConfig;
-  final Animation<double> slideAnimation;
-  final Animation<double> fadeAnimation;
 
   const _OnboardingPageWidget({
     required this.pageConfig,
-    required this.slideAnimation,
-    required this.fadeAnimation,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Main icon with animation
-          SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.5),
-              end: Offset.zero,
-            ).animate(slideAnimation),
-            child: FadeTransition(
-              opacity: fadeAnimation,
-              child: Container(
-                width: OnboardingConfig.iconContainerSize,
-                height: OnboardingConfig.iconContainerSize,
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery
+                .of(context)
+                .size
+                .height - 250,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Simple icon
+              Container(
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: pageConfig.gradientColors.first.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   pageConfig.icon,
-                  size: OnboardingConfig.iconSize,
-                  color: Colors.white,
+                  size: 40,
+                  color: pageConfig.gradientColors.first,
                 ),
               ),
-            ),
-          ),
 
-          const SizedBox(height: 40),
+              const SizedBox(height: 32),
 
-          // Title
-          SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.3),
-              end: Offset.zero,
-            ).animate(slideAnimation),
-            child: FadeTransition(
-              opacity: fadeAnimation,
-              child: Text(
+              // Title
+              Text(
                 pageConfig.title,
-                style: TextStyle(
-                  fontSize: OnboardingConfig.titleFontSize,
+                style: const TextStyle(
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  height: 1.2,
+                  color: Colors.black87,
                 ),
                 textAlign: TextAlign.center,
               ),
-            ),
-          ),
 
-          const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-          // Subtitle
-          SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.2),
-              end: Offset.zero,
-            ).animate(slideAnimation),
-            child: FadeTransition(
-              opacity: fadeAnimation,
-              child: Text(
+              // Subtitle
+              Text(
                 pageConfig.subtitle,
                 style: TextStyle(
-                  fontSize: OnboardingConfig.subtitleFontSize,
+                  fontSize: 18,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.9),
+                  color: pageConfig.gradientColors.first,
                 ),
                 textAlign: TextAlign.center,
               ),
-            ),
-          ),
 
-          const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-          // Description
-          SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.1),
-              end: Offset.zero,
-            ).animate(slideAnimation),
-            child: FadeTransition(
-              opacity: fadeAnimation,
-              child: Text(
+              // Description
+              Text(
                 pageConfig.description,
-                style: TextStyle(
-                  fontSize: OnboardingConfig.descriptionFontSize,
-                  color: Colors.white.withOpacity(0.8),
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black54,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 4,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ),
 
-          const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-          // Features list
-          SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.1),
-              end: Offset.zero,
-            ).animate(slideAnimation),
-            child: FadeTransition(
-              opacity: fadeAnimation,
-              child: Container(
-                padding: const EdgeInsets.all(20),
+              // Features list
+              Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.grey.shade200,
                     width: 1,
                   ),
                 ),
@@ -407,7 +302,7 @@ class _OnboardingPageWidget extends StatelessWidget {
                             width: 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.8),
+                              color: pageConfig.gradientColors.first,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -415,9 +310,9 @@ class _OnboardingPageWidget extends StatelessWidget {
                           Expanded(
                             child: Text(
                               feature,
-                              style: TextStyle(
-                                fontSize: OnboardingConfig.featureFontSize,
-                                color: Colors.white.withOpacity(0.9),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -428,9 +323,9 @@ class _OnboardingPageWidget extends StatelessWidget {
                   }).toList(),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/progress_service.dart';
 import '../../utils/app_theme.dart';
 import '../chat/chat_screen.dart';
 import '../flashcards/flashcard_screen.dart';
+import '../quiz/quiz_screen.dart';
+import '../stats/stats_screen.dart';
 import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -31,6 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const ChatScreen(),
       const FlashcardScreen(),
+      const QuizScreen(),
+      const StatsScreen(),
       const ProfileScreen(),
     ];
   }
@@ -53,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex,
+          currentIndex: _currentIndex >= 5 ? 0 : _currentIndex,
           type: BottomNavigationBarType.fixed,
           onTap: (index) {
             setState(() {
@@ -66,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat),
+              icon: Icon(Icons.school),
               label: 'AI Tutor',
             ),
             BottomNavigationBarItem(
@@ -74,8 +79,12 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Flashcards',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'Profile',
+              icon: Icon(Icons.quiz),
+              label: 'Quiz',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics),
+              label: 'Stats',
             ),
           ],
         ),
@@ -93,8 +102,38 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            final user = authProvider.user;
+
+            return Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: GestureDetector(
+                onTap: () {
+                  onNavigate(5);
+                },
+                child: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Theme
+                      .of(context)
+                      .colorScheme
+                      .primary,
+                  backgroundImage: user?.photoURL != null
+                      ? NetworkImage(user!.photoURL!)
+                      : null,
+                  child: user?.photoURL == null
+                      ? Icon(
+                    Icons.account_circle,
+                    color: Colors.white,
+                    size: 24,
+                  )
+                      : null,
+                ),
+              ),
+            );
+          },
+        ),
         title: const Text('AI Study Companion'),
-        automaticallyImplyLeading: false,
         centerTitle: true,
         actions: [
           IconButton(
@@ -107,356 +146,247 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Section
-            Consumer<AuthProvider>(
-              builder: (context, authProvider, child) {
-                final user = authProvider.user;
-                final userName = user?.displayName
-                    ?.split(' ')
-                    .first ?? 'Student';
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back, $userName! 👋',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Ready to continue your learning journey?',
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .bodyLarge
-                          ?.copyWith(
-                        color: AppTheme.withOpacity(
-                            Theme
-                                .of(context)
-                                .colorScheme
-                                .onSurface, 0.7),
-                      ),
-                    ),
-                    Text(
-                      _getGreetingMessage(),
-                      style: Theme
-                          .of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(
-                        color: AppTheme.withOpacity(
-                            Theme
-                                .of(context)
-                                .colorScheme
-                                .onSurface, 0.6),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-
-            const SizedBox(height: 32),
-
-            // Daily Progress Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Theme
-                        .of(context)
-                        .colorScheme
-                        .primary,
-                    Theme
-                        .of(context)
-                        .colorScheme
-                        .secondary,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.withOpacity(
-                        Theme
-                            .of(context)
-                            .colorScheme
-                            .primary, 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Daily Progress',
-                        style: Theme
-                            .of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Icon(
-                        Icons.trending_up,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  LinearProgressIndicator(
-                    value: 0.3, // Placeholder value
-                    backgroundColor: AppTheme.withOpacity(Colors.white, 0.3),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                        Colors.white),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '30 min / 100 min',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Quick Actions Section
-            Text(
-              'Quick Actions',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Quick Action Grid
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.2,
-              children: [
-                _buildQuickActionCard(
-                  context,
-                  'AI Tutor',
-                  'Get instant help with any question',
-                  Icons.chat_bubble_outline,
-                  Colors.blue,
-                      () {
-                        onNavigate(1);
-                  },
-                ),
-                _buildQuickActionCard(
-                  context,
-                  'Flashcards',
-                  'Generate AI-powered flashcards',
-                  Icons.style,
-                  Colors.green,
-                      () {
-                        onNavigate(2);
-                  },
-                ),
-                _buildQuickActionCard(
-                  context,
-                  'Study Stats',
-                  'Track your learning progress',
-                  Icons.analytics,
-                  Colors.orange,
-                      () {
-                        onNavigate(3);
-                  },
-                ),
-                _buildQuickActionCard(
-                  context,
-                  'Voice Learning',
-                  'Practice with voice commands',
-                  Icons.mic,
-                  Colors.purple,
-                      () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Voice learning coming soon!')),
-                    );
-                  },
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 32),
-
-            // Recent Activity Section
-            Text(
-              'Recent Activity',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Recent Activity Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Theme
-                    .of(context)
-                    .colorScheme
-                    .surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppTheme.withOpacity(
-                      Theme
-                          .of(context)
-                          .colorScheme
-                          .outline, 0.2),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.timeline,
-                    size: 48,
-                    color: Theme
-                        .of(context)
-                        .colorScheme
-                        .primary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Start Learning Today',
-                    style: Theme
-                        .of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Begin your journey with AI-powered tutoring and smart flashcards',
-                    textAlign: TextAlign.center,
-                    style: Theme
-                        .of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(
-                      color: AppTheme.withOpacity(
-                          Theme
-                              .of(context)
-                              .colorScheme
-                              .onSurface, 0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      body: _buildHomeContent(),
     );
   }
 
-  Widget _buildQuickActionCard(BuildContext context,
-      String title,
-      String description,
-      IconData icon,
-      Color color,
-      VoidCallback onTap,) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppTheme.withOpacity(color, 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppTheme.withOpacity(color, 0.2),
+  Widget _buildHomeContent() {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final user = authProvider.user;
+        final userModel = authProvider.userModel;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_getGreeting()}, ${user?.displayName
+                              ?.split(' ')
+                              .first ?? userModel?.displayName
+                              ?.split(' ')
+                              .first ?? 'Student'}! 👋',
+                          style: Theme
+                              .of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme
+                                .of(context)
+                                .colorScheme
+                                .primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _getGreetingMessage(),
+                          style: Theme
+                              .of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(
+                            color: AppTheme.withOpacity(
+                              Theme
+                                  .of(context)
+                                  .colorScheme
+                                  .onSurface,
+                              0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  if (authProvider.user == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return FutureBuilder<StudyGoalProgress>(
+                    future: ProgressService().getStudyGoalProgress(
+                        authProvider.user!.uid, 60),
+                    builder: (context, snapshot) {
+                      final progress = snapshot.data;
+                      final progressValue = progress != null
+                          ? (progress.todayProgress / progress.dailyGoal).clamp(
+                          0.0, 1.0)
+                          : 0.0;
+                      final todayMinutes = progress?.todayProgress ?? 0;
+                      final goalMinutes = progress?.dailyGoal ?? 60;
+
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Theme
+                                  .of(context)
+                                  .colorScheme
+                                  .primary,
+                              Theme
+                                  .of(context)
+                                  .colorScheme
+                                  .secondary,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.withOpacity(
+                                  Theme
+                                      .of(context)
+                                      .colorScheme
+                                      .primary, 0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Daily Progress',
+                                  style: Theme
+                                      .of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Icon(
+                                  progress?.isGoalMet == true
+                                      ? Icons.check_circle
+                                      : Icons.trending_up,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            LinearProgressIndicator(
+                              value: progressValue,
+                              backgroundColor: AppTheme.withOpacity(
+                                  Colors.white, 0.3),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.white),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              '$todayMinutes min / $goalMinutes min',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              Text(
+                'Quick Actions',
+                style: Theme
+                    .of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.5,
+                children: [
+                  _buildQuickActionCard(
+                    context,
+                    'AI Tutor',
+                    'Ask questions & get help',
+                    Icons.school,
+                    Colors.blue,
+                        () => onNavigate(1),
+                  ),
+                  _buildQuickActionCard(
+                    context,
+                    'Flashcards',
+                    'Create study cards',
+                    Icons.style,
+                    Colors.green,
+                        () => onNavigate(2),
+                  ),
+                  _buildQuickActionCard(
+                    context,
+                    'Quiz',
+                    'Test your knowledge',
+                    Icons.quiz,
+                    Colors.purple,
+                        () => onNavigate(3),
+                  ),
+                  _buildQuickActionCard(
+                    context,
+                    'Study Stats',
+                    'Track progress',
+                    Icons.analytics,
+                    Colors.orange,
+                        () => onNavigate(4),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+            ],
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: color,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(
-                color: AppTheme.withOpacity(
-                    Theme
-                        .of(context)
-                        .colorScheme
-                        .onSurface, 0.7),
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime
+        .now()
+        .hour;
+    if (hour < 12) {
+      return 'Good Morning';
+    } else if (hour < 17) {
+      return 'Good Afternoon';
+    } else {
+      return 'Good Evening';
+    }
   }
 
   String _getGreetingMessage() {
@@ -471,5 +401,105 @@ class DashboardScreen extends StatelessWidget {
       return 'Good evening! Perfect time to review.';
     }
   }
-}
 
+  Widget _buildQuickActionCard(BuildContext context,
+      String title,
+      String subtitle,
+      IconData icon,
+      Color color,
+      VoidCallback onTap,) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Theme
+                .of(context)
+                .colorScheme
+                .surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppTheme.withOpacity(
+                Theme
+                    .of(context)
+                    .colorScheme
+                    .outline,
+                0.2,
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.1),
+                blurRadius: 8,
+                spreadRadius: 1,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: Theme
+                    .of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme
+                      .of(context)
+                      .colorScheme
+                      .onSurface,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: Theme
+                    .of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(
+                  color: AppTheme.withOpacity(
+                    Theme
+                        .of(context)
+                        .colorScheme
+                        .onSurface,
+                    0.6,
+                  ),
+                  fontSize: 11,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
