@@ -49,10 +49,10 @@ dependencies:
   path_provider: ^2.1.4
   permission_handler: ^11.3.1
   
-  # Audio Features (Optional - removed due to compatibility issues)
-  # speech_to_text: ^6.6.2
-  # flutter_tts: ^4.0.2
-
+  # Audio Features
+  speech_to_text: ^6.6.2
+  flutter_tts: ^4.0.2
+  
   # Monetization
   in_app_purchase: ^3.1.13
 
