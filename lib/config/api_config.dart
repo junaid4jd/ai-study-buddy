@@ -10,12 +10,11 @@ class ApiConfig {
   // 4. Click "Create new secret key"
   // 5. Copy the key and paste it below
 
-  // 🚨 IMPORTANT: Replace "YOUR_OPENAI_API_KEY_HERE" with your actual API key
-  static const String openAiApiKey =
-      "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";
+  // IMPORTANT: Replace "YOUR_OPENAI_API_KEY_HERE" with your actual API key
+  static const String openAiApiKey = "YOUR_OPENAI_API_KEY_HERE";
 
   // ============================================================================
-  // 🤖 OPENAI SETTINGS - CUSTOMIZE AS NEEDED
+  // OPENAI SETTINGS - CUSTOMIZE AS NEEDED
   // ============================================================================
 
   // Model to use (gpt-3.5-turbo is recommended for cost-effectiveness)
